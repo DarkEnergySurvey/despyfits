@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-# $Id: fitsutils.py 18485 2014-01-29 15:57:50Z mgower $
-# $Rev:: 18485                            $:  # Revision of last commit.
-# $LastChangedBy:: mgower                 $:  # Author of last commit.
-# $LastChangedDate:: 2014-01-29 09:57:50 #$:  # Date of last commit.
+# $Id$
+# $Rev::                                  $:  # Revision of last commit.
+# $LastChangedBy::                        $:  # Author of last commit.
+# $LastChangedDate::                      $:  # Date of last commit.
 
 import re
 import os
