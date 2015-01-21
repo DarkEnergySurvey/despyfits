@@ -14,5 +14,6 @@ setup(name='despyfits',
       packages = ['despyfits'],
       package_dir = {'': 'python'},
       scripts = bin_files,
+      data_files=[('ups',['ups/despyfits.table'])],
       )
 
