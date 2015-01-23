@@ -8,28 +8,19 @@ possibly accompanied by mask and weight maps.
 # imports
 
 import fitsio
+import logging
 from fitsio import FITSHDR
 import numpy as np
+import ctypes
+import re
 
 # constants
 
 image_hdu = None
 mask_hdu = 1
 weight_hdu = 2
-
-BADPIX_BPM = 1         
-BADPIX_SATURATE = 2    
-BADPIX_INTERP = 4      
-BADPIX_THRESHOLD = 0.10
-BADPIX_LOW = 8     
-BADPIX_CRAY = 16     
-BADPIX_STAR= 32     
-BADPIX_TRAIL= 64     
-BADPIX_EDGEBLEED = 128 
-BADPIX_SSXTALK = 256   
-BADPIX_EDGE = 512    
-BADPIX_STREAK = 1024   
-BADPIX_FIX = 2048
+logger = logging.getLogger('DESImage')
+logger.addHandler(logging.StreamHandler())
   
 # exception classes
 
@@ -50,7 +41,18 @@ class UnexpectedDesExt(Exception):
         self.value = value
     def __str__(self):
         return repr(self.value)
-    
+
+class MissingFITSKeyword(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
+
+class BadFITSSectionSpec(Exception):
+    def __init__(self, value):
+        self.value = value
+    def __str__(self):
+        return repr(self.value)
 
 # interface functions
 # classes
@@ -81,6 +83,9 @@ class HeaderDifference(object):
         return s
 
 class DESDataImage(object):
+
+    data_dtype = np.dtype(np.float32)
+
     def __init__(self, data, header={}, pri_hdr=None):
         """Create a new DESDataImage
 
@@ -90,7 +95,7 @@ class DESDataImage(object):
             - `pri_hdr`: the primary header of the FITS file
 
         """
-        self.data = localize_numpy_array(data)
+        self.data = localize_numpy_array(data, self.data_dtype)
 
         if getattr(header, "add_record", None) is None:
             self.header = FITSHDR(header)
@@ -159,6 +164,9 @@ class DESDataImage(object):
 
 class DESImage(DESDataImage):
 
+    mask_dtype = np.dtype(np.int16)
+    weight_dtype = np.dtype(np.float32)
+
     def __init__(self):
         """Create a new DESImage
 
@@ -192,10 +200,12 @@ class DESImage(DESDataImage):
         im.data = data_im.data
         im.header = data_im.header
         im.pri_hdr = data_im.pri_hdr
-        im.mask = localize_numpy_array(mask) if mask is not None \
-                  else np.zeros_like(im.data, dtype=np.uint16)
-        im.weight = localize_numpy_array(weight) if weight is not None \
-                    else np.ones_like(im.data, dtype=np.float32)
+        im.mask = localize_numpy_array(mask, cls.mask_dtype) \
+                  if mask is not None \
+                     else np.zeros_like(im.data, dtype=cls.mask_dtype)
+        im.weight = localize_numpy_array(weight, cls.weight_dtype) \
+                    if weight is not None \
+                    else np.ones_like(im.data, dtype=cls.weight_dtype)
         return im
 
     @classmethod
@@ -216,25 +226,30 @@ class DESImage(DESDataImage):
         im = cls.create(data_im)
 
         found_mask, found_weight = False, False
-        for ext in (mask_hdu, weight_hdu, 1, 2):
+        for ext in (mask_hdu, weight_hdu, 0, 1, 2):
             try:
                 data, hdr = fitsio.read(filename, ext=ext+data_hdu, header=True)
             except ValueError:
                 # we probably don't have all HDUs
                 break
 
-            data = localize_numpy_array(data)
-            if 'DES_EXT' in hdr.keys():
-                if (hdr['DES_EXT'].rstrip()=='MASK' 
-                    or hdr['DES_EXT'].rstrip()=='MSK') and not found_mask:
-                    im.mask = data
-                    im.mask_hdr = hdr
-                    found_mask = True
-                elif (hdr['DES_EXT'].rstrip()=='WEIGHT' 
-                      or hdr['EXTNAME'].rstrip()=='WGT') and not found_weight:
-                    im.weight = data
-                    im.weight_hdr = hdr
-                    found_weight = True
+            def is_hdr_type(name1, name2):
+                kv_pairs = (('DES_EXT', name1),
+                            ('EXTNAME', name2))
+                for key, value in kv_pairs:
+                    if key in hdr.keys():
+                        if hdr[key].rstrip()==value:
+                            return True
+                return False
+
+            if is_hdr_type('MASK', 'MSK') and not found_mask:
+                im.mask = localize_numpy_array(data, im.mask_dtype)
+                im.mask_hdr = hdr
+                found_mask = True
+            elif is_hdr_type('WEIGHT', 'WGT') and not found_weight:
+                im.weight = localize_numpy_array(data, im.weight_dtype)
+                im.weight_hdr = hdr
+                found_weight = True
 
         return im
 
@@ -272,19 +287,35 @@ class DESImage(DESDataImage):
             # Create any HDUs that are needed but don't already exist
             max_hdu = max([data_hdu, mask_hdu, weight_hdu])
             max_init_hdu = len(fits) if file_exists else 0
+
             for hdu in range(max_init_hdu, max_hdu+1):
                 if hdu==mask_hdu:
                     fits.create_image_hdu(self.mask)
-                    fits[mask_hdu].write_key('DES_EXT','MASK')
-                    fits[mask_hdu].write_key('EXTNAME','MSK')
+                    if save_mask:
+                        # If we can, write the HDU as we create it
+                        # because insertion into the middle of a
+                        # FITS file is slow.
+                        fits[mask_hdu].write_keys(self.mask_hdr)
+                        fits[mask_hdu].write_key('DES_EXT','MASK')
+                        fits[mask_hdu].write_key('EXTNAME','MSK')
+                        fits[mask_hdu].write(self.mask)
+                        save_mask = False
                 elif hdu==weight_hdu:
                     fits.create_image_hdu(self.weight)
-                    fits[weight_hdu].write_key('DES_EXT','WEIGHT')
-                    fits[weight_hdu].write_key('EXTNAME','WGT')
+                    if save_weight:
+                        fits[weight_hdu].write_keys(self.weight_hdr)
+                        fits[weight_hdu].write_key('DES_EXT','WEIGHT')
+                        fits[weight_hdu].write_key('EXTNAME','WGT')
+                        fits[weight_hdu].write(self.weight)
+                        save_weight = False
                 elif hdu==data_hdu:
                     fits.create_image_hdu(self.data)
-                    fits[data_hdu].write_key('DES_EXT','IMAGE')
-                    fits[data_hdu].write_key('EXTNAME','SCI')
+                    if save_data:
+                        fits[data_hdu].write_keys(self.header)
+                        fits[data_hdu].write_key('DES_EXT','IMAGE')
+                        fits[data_hdu].write_key('EXTNAME','SCI')
+                        fits[data_hdu].write(self.data)
+                        save_data = False
                 else:
                     fits.create_image_hdu(self.data)
 
@@ -312,6 +343,13 @@ class DESImage(DESDataImage):
                 self.weight_hdr['DES_EXT']='WEIGHT'
                 fits[weight_hdu].write(self.weight)
                 fits[weight_hdu].write_keys(self.weight_hdr)
+
+    @property
+    def cstruct(self):
+        """Return a structure passable to C libraries using ctypes
+        """
+        self._cstruct = DESImageCStruct(self)
+        return self._cstruct
 
     def compare(self, im):
         """Show differences between images
@@ -353,8 +391,98 @@ class DESImage(DESDataImage):
 
 # internal functions & classes
 
-def localize_numpy_array(data):
-    native_dtype = data.dtype.newbyteorder('N')
+def scan_fits_section(hdr, keyword):
+    str_value = hdr[keyword]
+    pattern = r"\[(\d+):(\d+),(\d+):(\d+)\]"
+    m = re.match(pattern, str_value)
+    if len(m.groups()) != 4:
+        raise BadFITSSectionSpec("%s %s" % (keyword, str_value))
+
+    values = [int(s) for s in m.groups()]
+    return values
+
+
+libdesimage = ctypes.CDLL('libdesimage.so')
+set_desimage = libdesimage.set_desimage
+
+SevenLongs = ctypes.c_long * 7
+FourInts = ctypes.c_int * 4
+
+class DESImageCStruct(ctypes.Structure):
+    """Partially simulate desimage from imsupport
+    """
+
+    #
+    # This needs to match ../include/desimage.h
+    #  see desimage from imsupport/include/imreadsubs.h
+    #  for guidance, but this does not attempt to be compatible
+    _fields_ = [
+        ('npixels', ctypes.c_long),
+        ('axes', SevenLongs),
+        ('exptime', ctypes.c_float),
+        ('ampsecan', FourInts),
+        ('ampsecbn', FourInts),
+        ('saturateA', ctypes.c_float),
+        ('saturateB', ctypes.c_float),
+        ('gainA', ctypes.c_float),
+        ('gainB', ctypes.c_float),
+        ('rdnoiseA', ctypes.c_float),
+        ('rdnoiseB', ctypes.c_float),
+        ('image', ctypes.POINTER(ctypes.c_float)),
+        ('varim', ctypes.POINTER(ctypes.c_float)),
+        ('mask', ctypes.POINTER(ctypes.c_short))
+    ]
+
+    def __init__(self, im):
+        im_shape = im.data.shape
+        self.npixels = im.data.size
+        self.axes = SevenLongs(im_shape[1], im_shape[0], 0, 0, 0, 0, 0)
+
+        try:
+            self.ampsecan = FourInts(*scan_fits_section(im, 'AMPSECA'))
+        except ValueError:
+            logger.warning("Keyword AMPSECA not defined")
+
+        try:
+            self.ampsecbn = FourInts(*scan_fits_section(im, 'AMPSECB'))
+        except ValueError:
+            logger.warning("Keyword AMPSECB not defined")
+
+        def get_header_value(keyword, default):
+            missing = (keyword not in im.header) and (keyword not in im.pri_hdr)
+            if missing:
+                logging.warning("Keyword " + keyword + " not defined")
+
+            value = default if missing else im[keyword]
+            return value
+
+        self.exptime = get_header_value('EXPTIME', 0.0)
+        self.saturateA = get_header_value('SATURATA', 0.0)
+        self.saturateB = get_header_value('SATURATB', 0.0)
+        self.gainA = get_header_value('GAINA', 0.0)
+        self.gainB = get_header_value('GAINB', 0.0)
+        self.rdnoiseA = get_header_value('RDNOISEA', 0.0)
+        self.rdnoiseB = get_header_value('RDNOISEB', 0.0)
+
+        # Match argtypes to data provided to self.axes
+        set_desimage.restype = ctypes.c_int
+        set_desimage.argtypes = [
+            np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
+                                   flags = 'aligned, contiguous, writeable'),
+            np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
+                                   flags = 'aligned, contiguous, writeable'),
+            np.ctypeslib.ndpointer(ctypes.c_short, ndim=2, shape=im_shape,
+                                   flags = 'aligned, contiguous, writeable'),
+            ctypes.POINTER(DESImageCStruct)
+        ]
+        set_desimage(im.data, im.weight, im.mask, ctypes.byref(self))
+
+def localize_numpy_array(data, new_dtype=None):
+    if new_dtype is None:
+        native_dtype = data.dtype.newbyteorder('N')
+    else:
+        native_dtype = new_dtype.newbyteorder('N')
+
     try:
         local_data = data.astype(native_dtype, casting='equiv', copy=False)
     except TypeError:
