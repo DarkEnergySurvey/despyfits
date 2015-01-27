@@ -13,6 +13,7 @@ from fitsio import FITSHDR
 import numpy as np
 import ctypes
 import re
+from collections import namedtuple
 
 # constants
 
@@ -360,37 +361,59 @@ class DESImage(DESDataImage):
         @Returns: a difference image
 
         """
-        print HeaderDifference(self, im)
+        header_diff = HeaderDifference(self, im)
         hdus = (('science', self.data, im.data),
                 ('mask', self.mask, im.mask),
                 ('weight', self.weight, im.weight))
-        print
 
-        diffs = DESImage()
+        diff_im = DESImage()
         for ext, im1, im2 in hdus:
-            print ext
-            if not im1.shape==im2.shape:
-                print "shape differs, im1: ", im1.shape, " im2: ", im2.shape
-            if not im1.dtype==im2.dtype:
-                print "dtype differs, im1: ", im1.dtype, " im2: ", im2.dtype
-
-            delta = im1-im2
             if ext=='science':
-                diffs.data = delta
+                diff_im.data = im1-im2
             elif ext=='mask':
-                diffs.mask = delta
+                diff_im.mask = np.bitwise_xor(im1, im2)
             elif ext=='weight':
-                diffs.weight = delta
+                diff_im.weight = im1-im2
 
-            if (im1==im2).all():
-                print "perfect match of values"
-            else:
-                print str(np.min(delta)) + " <= im1-im2 <= " + str(np.max(delta))
-
-        return diffs
+        comparison = DESImageComparison(header_diff, diff_im)
+        return comparison
 
 # internal functions & classes
 
+DESImageComparisonNT = namedtuple('DESImageComparisonNT',
+                                  ('header', 'diff_im'))
+class DESImageComparison(DESImageComparisonNT):
+    @property
+    def mismatched_keywords(self):
+        mk = set(
+            [k for k in self.header
+             if len(self.header[k])>1] )
+        return mk
+
+    @property
+    def data_match(self):
+        m = np.count_nonzero(self.diff_im.data) == 0
+        return m
+                
+    @property
+    def mask_match(self):
+        m = np.count_nonzero(self.diff_im.mask) == 0
+        return m
+                
+    @property
+    def weight_match(self):
+        m = np.count_nonzero(self.diff_im.weight) == 0
+        return m
+              
+    @property
+    def match(self, ignore=set()):
+        differing_keywords = self.mismatched_keywords - set(ignore)
+
+        m = len(differing_keywords) > 0 \
+            or not (self.data_match and self.weight_match and self.mask_match)
+
+        return m
+                 
 def scan_fits_section(hdr, keyword):
     str_value = hdr[keyword]
     pattern = r"\[(\d+):(\d+),(\d+):(\d+)\]"
