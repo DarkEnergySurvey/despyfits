@@ -15,14 +15,21 @@ import ctypes
 import re
 from collections import namedtuple
 
+from despyfits import maskbits
+
 # constants
 
 image_hdu = None
 mask_hdu = 1
 weight_hdu = 2
+mask_dtype = np.dtype(np.int16)
+weight_dtype = np.dtype(np.float32)
+data_dtype = np.dtype(np.float32)
+pass_fortran = False
+
 logger = logging.getLogger('DESImage')
 logger.addHandler(logging.StreamHandler())
-  
+ 
 # exception classes
 
 class MissingData(Exception):
@@ -62,7 +69,12 @@ class HeaderDifference(object):
     def __init__(self, im1, im2):
         self.match = {}
         self.diff = {}
+                        
         for k in set(im1.header.keys()) | set(im2.header.keys()):
+            if len(k)>8:
+                # Invalid FITS keyword
+                continue
+
             v = [None, None]
 
             if k in im1.header.keys():
@@ -70,6 +82,7 @@ class HeaderDifference(object):
             if k in im2.header.keys():
                 v[1] = im2.header[k]
             
+                        
             if not v[0]==v[1]:
                 self.diff[k] = v
             else:
@@ -85,7 +98,6 @@ class HeaderDifference(object):
 
 class DESDataImage(object):
 
-    data_dtype = np.dtype(np.float32)
 
     def __init__(self, data, header={}, pri_hdr=None):
         """Create a new DESDataImage
@@ -96,7 +108,7 @@ class DESDataImage(object):
             - `pri_hdr`: the primary header of the FITS file
 
         """
-        self.data = localize_numpy_array(data, self.data_dtype)
+        self.data = data
 
         if getattr(header, "add_record", None) is None:
             self.header = FITSHDR(header)
@@ -165,9 +177,6 @@ class DESDataImage(object):
 
 class DESImage(DESDataImage):
 
-    mask_dtype = np.dtype(np.int16)
-    weight_dtype = np.dtype(np.float32)
-
     def __init__(self):
         """Create a new DESImage
 
@@ -201,12 +210,10 @@ class DESImage(DESDataImage):
         im.data = data_im.data
         im.header = data_im.header
         im.pri_hdr = data_im.pri_hdr
-        im.mask = localize_numpy_array(mask, cls.mask_dtype) \
-                  if mask is not None \
-                     else np.zeros_like(im.data, dtype=cls.mask_dtype)
-        im.weight = localize_numpy_array(weight, cls.weight_dtype) \
-                    if weight is not None \
-                    else np.ones_like(im.data, dtype=cls.weight_dtype)
+        im.mask = mask if mask is not None \
+                     else np.zeros_like(im.data, dtype=np.dtype(np.int16))
+        im.weight = weight if weight is not None \
+                    else np.ones_like(im.data, dtype= np.dtype(np.float32))
         return im
 
     @classmethod
@@ -227,7 +234,7 @@ class DESImage(DESDataImage):
         im = cls.create(data_im)
 
         found_mask, found_weight = False, False
-        for ext in (mask_hdu, weight_hdu, 0, 1, 2):
+        for ext in sorted(set((mask_hdu, weight_hdu, 0, 1, 2))):
             try:
                 data, hdr = fitsio.read(filename, ext=ext+data_hdu, header=True)
             except ValueError:
@@ -244,11 +251,11 @@ class DESImage(DESDataImage):
                 return False
 
             if is_hdr_type('MASK', 'MSK') and not found_mask:
-                im.mask = localize_numpy_array(data, im.mask_dtype)
+                im.mask = localize_numpy_array(data, mask_dtype)
                 im.mask_hdr = hdr
                 found_mask = True
             elif is_hdr_type('WEIGHT', 'WGT') and not found_weight:
-                im.weight = localize_numpy_array(data, im.weight_dtype)
+                im.weight = localize_numpy_array(data, weight_dtype)
                 im.weight_hdr = hdr
                 found_weight = True
 
@@ -332,7 +339,12 @@ class DESImage(DESDataImage):
                 if hdr['DES_EXT'].rstrip() != 'MASK':
                     raise UnexpectedDesExt('mask not in expected HDU')
 
-                self.mask_hdr['DES_EXT']='MASK'
+                if 'DES_EXT' in self.mask_hdr:
+                    if self.mask_hdr['DES_EXT'].rstrip() != 'MASK':
+                        raise UnexpectedDesExt('mask not in expected HDU')
+                else:
+                    self.mask_hdr['DES_EXT']='MASK'
+                
                 fits[mask_hdu].write(self.mask)
                 fits[mask_hdu].write_keys(self.mask_hdr)
 
@@ -341,7 +353,13 @@ class DESImage(DESDataImage):
                 if hdr['DES_EXT'].rstrip() != 'WEIGHT':
                     raise UnexpectedDesExt('weight not in expected HDU')
 
-                self.weight_hdr['DES_EXT']='WEIGHT'
+
+                if 'DES_EXT' in self.weight_hdr:
+                    if self.weight_hdr['DES_EXT'].rstrip() != 'WEIGHT':
+                        raise UnexpectedDesExt('weight not in expected HDU')
+                else:
+                    self.weight_hdr['DES_EXT']='WEIGHT'
+
                 fits[weight_hdu].write(self.weight)
                 fits[weight_hdu].write_keys(self.weight_hdr)
 
@@ -349,6 +367,16 @@ class DESImage(DESDataImage):
     def cstruct(self):
         """Return a structure passable to C libraries using ctypes
         """
+
+        if pass_fortran:
+            self.data = np.asfortranarray(localize_numpy_array(self.data, data_dtype))
+            self.weight = np.asfortranarray(localize_numpy_array(self.weight, weight_dtype))
+            self.mask = np.asfortranarray(localize_numpy_array(self.mask, mask_dtype))
+        else:
+            self.data = localize_numpy_array(self.data, data_dtype)
+            self.weight = localize_numpy_array(self.weight, weight_dtype)
+            self.mask = localize_numpy_array(self.mask, mask_dtype)
+
         self._cstruct = DESImageCStruct(self)
         return self._cstruct
 
@@ -386,8 +414,7 @@ class DESImageComparison(DESImageComparisonNT):
     @property
     def mismatched_keywords(self):
         mk = set(
-            [k for k in self.header
-             if len(self.header[k])>1] )
+            [k for k in self.header.diff] )
         return mk
 
     @property
@@ -405,14 +432,73 @@ class DESImageComparison(DESImageComparisonNT):
         m = np.count_nonzero(self.diff_im.weight) == 0
         return m
               
-    @property
     def match(self, ignore=set()):
         differing_keywords = self.mismatched_keywords - set(ignore)
 
-        m = len(differing_keywords) > 0 \
-            or not (self.data_match and self.weight_match and self.mask_match)
+        m = len(differing_keywords)==0 \
+            and self.data_match and self.weight_match and self.mask_match
 
         return m
+
+    def log(self, logger, ref):
+        logger.debug('Image size: %d', self.diff_im.data.size)
+        logger.debug('Data differences: %d', 
+                     np.count_nonzero(self.diff_im.data))
+        logger.debug('Weight differences: %d', 
+                     np.count_nonzero(self.diff_im.weight))
+        logger.debug(
+            'BADPIX_BPM differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_BPM),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_BPM))
+        logger.debug(
+            'BADPIX_SATURATE differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_SATURATE),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_SATURATE))
+        logger.debug(
+            'BADPIX_INTERP differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_INTERP),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_INTERP))
+        logger.debug(
+            'BADPIX_THRESHOLD differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_THRESHOLD),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_THRESHOLD))
+        logger.debug(
+            'BADPIX_LOW differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_LOW),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_LOW))
+        logger.debug(
+            'BADPIX_CRAY differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_CRAY),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_CRAY))
+        logger.debug(
+            'BADPIX_STAR differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_STAR),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_STAR))
+        logger.debug(
+            'BADPIX_TRAIL differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_TRAIL),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_TRAIL))
+        logger.debug(
+            'BADPIX_EDGEBLEED differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_EDGEBLEED),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_EDGEBLEED))
+        logger.debug(
+            'BADPIX_SSXTALK differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_SSXTALK),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_SSXTALK))
+        logger.debug(
+            'BADPIX_EDGE differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_EDGE),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_EDGE))
+        logger.debug(
+            'BADPIX_STREAK differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_STREAK),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_STREAK))
+        logger.debug(
+            'BADPIX_FIX differences: %d/%d',
+            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_FIX),
+            np.count_nonzero(ref.mask & maskbits.BADPIX_FIX)) 
+
                  
 def scan_fits_section(hdr, keyword):
     str_value = hdr[keyword]
@@ -488,14 +574,18 @@ class DESImageCStruct(ctypes.Structure):
         self.rdnoiseB = get_header_value('RDNOISEB', 0.0)
 
         # Match argtypes to data provided to self.axes
+        if pass_fortran:
+            npflags = 'aligned, f_contiguous, writeable'
+        else:
+            npflags = 'aligned, c_contiguous, writeable'
         set_desimage.restype = ctypes.c_int
         set_desimage.argtypes = [
             np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                   flags = 'aligned, contiguous, writeable'),
+                                   flags = npflags),
             np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                   flags = 'aligned, contiguous, writeable'),
+                                   flags = npflags),
             np.ctypeslib.ndpointer(ctypes.c_short, ndim=2, shape=im_shape,
-                                   flags = 'aligned, contiguous, writeable'),
+                                   flags = npflags),
             ctypes.POINTER(DESImageCStruct)
         ]
         set_desimage(im.data, im.weight, im.mask, ctypes.byref(self))
