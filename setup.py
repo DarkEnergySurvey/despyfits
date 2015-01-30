@@ -29,7 +29,6 @@ setup(name='despyfits',
       shlibs = [libdesimage, libmaskbits],
       packages = ['despyfits'],
       package_dir = {'': 'python'},
-      data_files = [('ups', ['ups/despyfits.table'])],
       scripts = bin_files,
       data_files=[('ups',['ups/despyfits.table'])],
       )
