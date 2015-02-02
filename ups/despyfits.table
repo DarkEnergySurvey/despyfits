@@ -1,4 +1,20 @@
-setupRequired(pyfits)
-envAppend(PYTHONPATH, ${PRODUCT_DIR}/lib/python2.7/site-packages)
+# Eventually we need to get rid of pyfits, but for now, they will co-exist.
+setupRequired(pyfits 3.3+1)
+setupRequired(fitsio 0.9.6+0)
+envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envAppend(PATH, ${PRODUCT_DIR}/bin)
+
+# For EUPS build scripts
 envAppend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
+if (FLAVOR == DarwinX86 || FLAVOR == Darwin) {
+   envPrepend(DYLD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
+}
+
+## For development use these -- after doing "python setup.py build"
+#envAppend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/build/temp.linux-x86_64-2.7/shlib)
+#if (FLAVOR == DarwinX86 || FLAVOR == Darwin) {
+#   envPrepend(DYLD_LIBRARY_PATH, ${PRODUCT_DIR}/build/temp.linux-x86_64-2.7/shlib)
+#}
+
+
+
