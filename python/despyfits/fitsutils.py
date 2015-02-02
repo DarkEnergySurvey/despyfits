@@ -11,6 +11,7 @@ import pyfits
 
 """ Miscellaneous generic support functions for fits files """
 
+
 class makeMEF(object):
 
     """
