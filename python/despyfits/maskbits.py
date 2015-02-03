@@ -2,8 +2,16 @@
 """Provied access to bit map canstants"""
 
 import ctypes
+import platform
 
-libmaskbits = ctypes.CDLL('libmaskbits.so')
+lib_ext = {'Linux': 'so',
+           'Darwin': 'dylib'}
+try:
+    libmaskbits = ctypes.CDLL(
+        'libmaskbits.' + lib_ext[platform.system()])
+except KeyError:
+    raise RuntimeError, ("Unknown platform: " + platform.system())
+
 
 const_names = ("BADPIX_BPM",
                "BADPIX_SATURATE",

@@ -7,14 +7,16 @@ possibly accompanied by mask and weight maps.
 
 # imports
 
-import fitsio
 import logging
-from fitsio import FITSHDR
-import numpy as np
+import platform
 import ctypes
 import re
 from collections import namedtuple
 
+import numpy as np
+
+import fitsio
+from fitsio import FITSHDR
 from despyfits import maskbits
 
 # constants
@@ -510,8 +512,15 @@ def scan_fits_section(hdr, keyword):
     values = [int(s) for s in m.groups()]
     return values
 
+lib_ext = {'Linux': 'so',
+           'Darwin': 'dylib'}
+try:
+    libdesimage = ctypes.CDLL(
+        'libdesimage.' + lib_ext[platform.system()])
+except KeyError:
+    raise RuntimeError, ("Unknown platform: " + platform.system())
 
-libdesimage = ctypes.CDLL('libdesimage.so')
+
 set_desimage = libdesimage.set_desimage
 
 SevenLongs = ctypes.c_long * 7
