@@ -11,3 +11,10 @@ int set_desimage(float *image, float *varim, short *mask, desimage *di) {
   return(0);
 }
 
+int set_data_desimage(float *image, desimage *di) {
+  di->image = image;
+  di->varim = NULL;
+  di->mask = NULL;
+  return(0);
+}
+

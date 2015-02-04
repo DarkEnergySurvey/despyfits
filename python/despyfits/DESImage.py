@@ -174,8 +174,18 @@ class DESDataImage(object):
         self.header[key] = value
 
 
+    @property
+    def cstruct(self):
+        """Return a structure passable to C libraries using ctypes
+        """
 
+        if pass_fortran:
+            self.data = np.asfortranarray(localize_numpy_array(self.data, data_dtype))
+        else:
+            self.data = localize_numpy_array(self.data, data_dtype)
 
+        self._cstruct = DESImageCStruct(self, data_only=True)
+        return self._cstruct
 
 class DESImage(DESDataImage):
 
@@ -551,7 +561,7 @@ class DESImageCStruct(ctypes.Structure):
         ('mask', ctypes.POINTER(ctypes.c_short))
     ]
 
-    def __init__(self, im):
+    def __init__(self, im, data_only=False):
         im_shape = im.data.shape
         self.npixels = im.data.size
         self.axes = SevenLongs(im_shape[1], im_shape[0], 0, 0, 0, 0, 0)
@@ -588,16 +598,26 @@ class DESImageCStruct(ctypes.Structure):
         else:
             npflags = 'aligned, c_contiguous, writeable'
         set_desimage.restype = ctypes.c_int
-        set_desimage.argtypes = [
-            np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                   flags = npflags),
-            np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                   flags = npflags),
-            np.ctypeslib.ndpointer(ctypes.c_short, ndim=2, shape=im_shape,
-                                   flags = npflags),
-            ctypes.POINTER(DESImageCStruct)
-        ]
-        set_desimage(im.data, im.weight, im.mask, ctypes.byref(self))
+
+        if data_only:
+            set_desimage.argtypes = [
+                np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
+                                       flags = npflags),
+                ctypes.POINTER(DESImageCStruct)
+            ]
+            set_data_desimage(im.data, ctypes.byref(self))
+        else:
+            set_desimage.argtypes = [
+                np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
+                                       flags = npflags),
+                np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
+                                       flags = npflags),
+                np.ctypeslib.ndpointer(ctypes.c_short, ndim=2, shape=im_shape,
+                                       flags = npflags),
+                ctypes.POINTER(DESImageCStruct)
+            ]
+            set_desimage(im.data, im.weight, im.mask, ctypes.byref(self))
+            
 
 def localize_numpy_array(data, new_dtype=None):
     if new_dtype is None:
