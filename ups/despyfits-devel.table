@@ -1,4 +1,4 @@
-setupRequired(pyfits 3.3+1)
+setupRequired(pyfits 3.0.8+13)
 envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envAppend(PATH, ${PRODUCT_DIR}/bin)
 

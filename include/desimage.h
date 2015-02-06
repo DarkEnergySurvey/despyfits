@@ -1,4 +1,6 @@
 
+#define CCDNUM2 76
+
 /* This struct must match DESImageStruct */
 
 typedef struct {

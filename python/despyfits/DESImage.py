@@ -162,7 +162,6 @@ class DESDataImage(object):
                     fits.create_image_hdu(self.data)
                 fits.write(self.data, header=self.header, ext=ext, clobber=True)
             
-
     # If we index this object, assume we are after keywords in the header
     def __getitem__(self, key):
         if key in self.header.keys():
@@ -184,7 +183,7 @@ class DESDataImage(object):
         else:
             self.data = localize_numpy_array(self.data, data_dtype)
 
-        self._cstruct = DESImageCStruct(self, data_only=True)
+        self._cstruct = DESImageCStruct(self)
         return self._cstruct
 
 class DESImage(DESDataImage):
@@ -222,12 +221,18 @@ class DESImage(DESDataImage):
         im.data = data_im.data
         im.header = data_im.header
         im.pri_hdr = data_im.pri_hdr
-        im.mask = mask if mask is not None \
-                     else np.zeros_like(im.data, dtype=np.dtype(np.int16))
-        im.weight = weight if weight is not None \
-                    else np.ones_like(im.data, dtype= np.dtype(np.float32))
+        im.mask = mask
+        im.weight = weight
         return im
 
+    def init_mask(self, mask=None):
+        self.mask = mask.astype(mask_dtype) if mask is not None \
+                    else np.zeros_like(self.data, dtype=mask_dtype)
+
+    def init_weight(self, weight=None):
+        self.weight = weight.astype(weight_dtype) if weight is not None \
+                      else np.ones_like(self.data, dtype=weight_dtype)
+        
     @classmethod
     def load(cls, filename):
         """Load from a FITS file
@@ -273,7 +278,7 @@ class DESImage(DESDataImage):
 
         return im
 
-    def save(self, filename, save_data=True, save_mask=True, save_weight=True):
+    def save(self, filename, save_data=True, save_mask=None, save_weight=None):
         """Save to a FITS file
 
         If the file exists and only some of the FITS extensions need to be
@@ -288,6 +293,24 @@ class DESImage(DESDataImage):
             - `save_weight`: true if the weight array is to be saved
 
         """
+
+        try:
+            has_mask = self.mask is not None
+        except AttributeError:
+            has_mask = False
+
+        try:
+            has_weight = self.weight is not None
+        except AttributeError:
+            has_weight = False
+
+        save_mask = save_mask if save_mask is not None else has_mask
+        if save_mask and not has_mask:
+            raise MissingMask
+
+        save_weight = save_weight if save_weight is not None else has_weight
+        if save_weight and not has_weight:
+            raise MissingWeight
         
         if image_hdu is None:
             data_hdu = 1 if filename.endswith('.fz') else 0
@@ -309,7 +332,7 @@ class DESImage(DESDataImage):
             max_init_hdu = len(fits) if file_exists else 0
 
             for hdu in range(max_init_hdu, max_hdu+1):
-                if hdu==mask_hdu:
+                if has_mask and hdu==mask_hdu:
                     fits.create_image_hdu(self.mask)
                     if save_mask:
                         # If we can, write the HDU as we create it
@@ -320,7 +343,7 @@ class DESImage(DESDataImage):
                         fits[mask_hdu].write_key('EXTNAME','MSK')
                         fits[mask_hdu].write(self.mask)
                         save_mask = False
-                elif hdu==weight_hdu:
+                elif has_weight and hdu==weight_hdu:
                     fits.create_image_hdu(self.weight)
                     if save_weight:
                         fits[weight_hdu].write_keys(self.weight_hdr)
@@ -374,6 +397,7 @@ class DESImage(DESDataImage):
 
                 fits[weight_hdu].write(self.weight)
                 fits[weight_hdu].write_keys(self.weight_hdr)
+
 
     @property
     def cstruct(self):
@@ -532,9 +556,11 @@ except KeyError:
 
 
 set_desimage = libdesimage.set_desimage
+CCDNUM2 = ctypes.c_int.in_dll(libdesimage, ccdnum2).value
 
 SevenLongs = ctypes.c_long * 7
 FourInts = ctypes.c_int * 4
+
 
 class DESImageCStruct(ctypes.Structure):
     """Partially simulate desimage from imsupport
@@ -561,7 +587,16 @@ class DESImageCStruct(ctypes.Structure):
         ('mask', ctypes.POINTER(ctypes.c_short))
     ]
 
-    def __init__(self, im, data_only=False):
+    def __init__(self, im=None, data_only=False, weightless=False):
+        if im is not None:
+            self.create(im, data_only, weightless)
+        else:
+            self.image = None
+            self.varim = None
+            self.mask = None
+            self.npixels = 0
+
+    def crete(self, im, data_only=False, weightless=False):
         im_shape = im.data.shape
         self.npixels = im.data.size
         self.axes = SevenLongs(im_shape[1], im_shape[0], 0, 0, 0, 0, 0)
@@ -599,13 +634,32 @@ class DESImageCStruct(ctypes.Structure):
             npflags = 'aligned, c_contiguous, writeable'
         set_desimage.restype = ctypes.c_int
 
-        if data_only:
+        try:
+            has_mask = self.mask is not None
+        except AttributeError:
+            has_mask = False
+
+        try:
+            has_weight = self.weight is not None
+        except AttributeError:
+            has_weight = False
+
+        if not (has_mask or has_weight):
             set_desimage.argtypes = [
                 np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
                                        flags = npflags),
                 ctypes.POINTER(DESImageCStruct)
             ]
             set_data_desimage(im.data, ctypes.byref(self))
+        elif hask_mask and not has_weight:
+            set_desimage.argtypes = [
+                np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
+                                       flags = npflags),
+                np.ctypeslib.ndpointer(ctypes.c_short, ndim=2, shape=im_shape,
+                                       flags = npflags),
+                ctypes.POINTER(DESImageCStruct)
+            ]
+            set_weightless_desimage(im.data, im.mask, ctypes.byref(self))
         else:
             set_desimage.argtypes = [
                 np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
