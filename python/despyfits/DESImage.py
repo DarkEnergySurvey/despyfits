@@ -126,12 +126,12 @@ class DESDataImage(object):
             self.pri_hdr = pri_hdr
 
     @classmethod
-    def load(cls, filename, ext=None):
+    def load(cls, filename, image_hdu=None):
         """Load from a FITS file
 
         :Parameters:
             - `filename`: the name of the FITS file from which to load
-            - `ext`: the HDU index with the data image
+            - `image_hdu`: the HDU index with the data image
 
         """
         if image_hdu is None:
@@ -188,7 +188,8 @@ class DESDataImage(object):
 
 class DESImage(DESDataImage):
 
-    def __init__(self):
+    def __init__(self, init_data=False, init_mask=False, init_weight=False,
+                 shape=(4096, 2048)):
         """Create a new DESImage
 
         Create an empty DESImage
@@ -196,9 +197,17 @@ class DESImage(DESDataImage):
         In mast cases, DESImage.create or DESImage.load will be safer 
         and more covenient.
         """
-        self.data = None
+
+        self.data = np.zeros(shape, dtype=data_dtype) if init_data else None
+
         self.mask = None
+        if init_mask:
+            self.init_mask()
+
         self.weight = None
+        if init_weight:
+            self.init_weight()
+            
         self.header = FITSHDR({})
         self.pri_hdr = self.header
         self.mask_hdr = FITSHDR({})

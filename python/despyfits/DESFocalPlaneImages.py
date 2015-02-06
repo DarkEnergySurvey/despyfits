@@ -8,19 +8,33 @@ FocalPlaneCStructArray = DESImageCStruct * CCDNUM2
 
 class DESFocalPlaneImages(object):
 
-    def __init__(self, fname):
+    def __init__(self, 
+                 init_data=False, init_mask=False, init_weight=False,
+                 shape=(4096, 2048)):
+        if init_data or init_mask or init_weight:
+            self.images = [DESDataImage(init_data=init_data,
+                                        init_maks=init_mask,
+                                        init_weight=init_weight,
+                                        shape=shape)
+                           for i in range(CCDNUM2)]
+
+    @classmethod
+    def load(cls, fname):
         fits = FITS(fname)
         hdus_present = len(fits)
         fits.close()
 
-        self.images = [DESDataImage.load(fname, ext)
-                       for ext in range(hdus_present)]
-            
+        images = cls()
+
+        images.images = [DESDataImage.load(fname, ext)
+                         for ext in range(hdus_present)]
+        return images
+
 
     def save(self, fname_template):
         for hdu, im in enumerate(self.images):
             fname = fname_template % hdu
-            self.images.save(fname)
+            im.save(fname)
 
     @property
     def cstruct(self):
