@@ -234,11 +234,15 @@ class DESImage(DESDataImage):
                       else np.ones_like(self.data, dtype=weight_dtype)
         
     @classmethod
-    def load(cls, filename):
+    def load(cls, filename, 
+             assign_default_mask=True, 
+             assign_default_weight=True):
         """Load from a FITS file
 
         :Parameters:
             - `filename`: the name of the FITS file from which to load
+            - `assign_default_mask`: create a default empty mask if none present
+            - `assign_default_weight`: create default weights if none present
 
         @returns: a new DESImage object with data from the FITS file
         """
@@ -275,6 +279,12 @@ class DESImage(DESDataImage):
                 im.weight = localize_numpy_array(data, weight_dtype)
                 im.weight_hdr = hdr
                 found_weight = True
+
+        if assign_default_mask and im.mask is None:
+            im.init_mask()
+                
+        if assign_default_weight and im.weight is None:
+            im.init_weight()
 
         return im
 
@@ -404,14 +414,6 @@ class DESImage(DESDataImage):
         """Return a structure passable to C libraries using ctypes
         """
 
-        if pass_fortran:
-            self.data = np.asfortranarray(localize_numpy_array(self.data, data_dtype))
-            self.weight = np.asfortranarray(localize_numpy_array(self.weight, weight_dtype))
-            self.mask = np.asfortranarray(localize_numpy_array(self.mask, mask_dtype))
-        else:
-            self.data = localize_numpy_array(self.data, data_dtype)
-            self.weight = localize_numpy_array(self.weight, weight_dtype)
-            self.mask = localize_numpy_array(self.mask, mask_dtype)
 
         self._cstruct = DESImageCStruct(self)
         return self._cstruct
@@ -556,7 +558,9 @@ except KeyError:
 
 
 set_desimage = libdesimage.set_desimage
-CCDNUM2 = ctypes.c_int.in_dll(libdesimage, ccdnum2).value
+set_data_desimage = libdesimage.set_data_desimage
+set_weightless_desimage = libdesimage.set_weightless_desimage
+CCDNUM2 = ctypes.c_int.in_dll(libdesimage, 'ccdnum2').value
 
 SevenLongs = ctypes.c_long * 7
 FourInts = ctypes.c_int * 4
@@ -587,16 +591,16 @@ class DESImageCStruct(ctypes.Structure):
         ('mask', ctypes.POINTER(ctypes.c_short))
     ]
 
-    def __init__(self, im=None, data_only=False, weightless=False):
+    def __init__(self, im=None):
         if im is not None:
-            self.create(im, data_only, weightless)
+            self.create(im)
         else:
             self.image = None
             self.varim = None
             self.mask = None
             self.npixels = 0
 
-    def crete(self, im, data_only=False, weightless=False):
+    def create(self, im, data_only=False, weightless=False):
         im_shape = im.data.shape
         self.npixels = im.data.size
         self.axes = SevenLongs(im_shape[1], im_shape[0], 0, 0, 0, 0, 0)
@@ -635,24 +639,44 @@ class DESImageCStruct(ctypes.Structure):
         set_desimage.restype = ctypes.c_int
 
         try:
-            has_mask = self.mask is not None
+            has_mask = im.mask is not None
         except AttributeError:
             has_mask = False
 
         try:
-            has_weight = self.weight is not None
+            has_weight = im.weight is not None
         except AttributeError:
             has_weight = False
 
+        # Test and correct data types if necessary
+
+        im.data = localize_numpy_array(im.data, data_dtype)
+
+        if has_mask:
+            im.mask = localize_numpy_array(im.mask, mask_dtype)
+
+        if has_weight:
+            im.weight = localize_numpy_array(im.weight, weight_dtype)
+
+        if pass_fortran:
+            im.data = np.asfortranarray(im.data)
+            if has_mask:
+                im.mask = np.asfortranarray(im.mask)
+            if has_weight:
+                im.weight = np.asfortranarray(im.weight)
+
+
+        # Set the call signature according to what we have, and call
+
         if not (has_mask or has_weight):
-            set_desimage.argtypes = [
+            set_data_desimage.argtypes = [
                 np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
                                        flags = npflags),
                 ctypes.POINTER(DESImageCStruct)
             ]
             set_data_desimage(im.data, ctypes.byref(self))
-        elif hask_mask and not has_weight:
-            set_desimage.argtypes = [
+        elif has_mask and not has_weight:
+            set_weightless_desimage.argtypes = [
                 np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
                                        flags = npflags),
                 np.ctypeslib.ndpointer(ctypes.c_short, ndim=2, shape=im_shape,
