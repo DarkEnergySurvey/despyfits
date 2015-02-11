@@ -25,12 +25,18 @@ from despyfits.DESFITSInventory import DESFITSInventory
 image_hdu = None
 mask_hdu = 1
 weight_hdu = 2
-mask_dtype = np.dtype(np.int16)
 weight_dtype = np.dtype(np.float32)
 data_dtype = np.dtype(np.float32)
 pass_fortran = False
 
-# IGNORED_HDR_KWDS = ['NAXIS1','NAXIS2']
+mask_is_unsigned = True
+if mask_is_unsigned:
+    mask_dtype = np.dtype(np.uint16)
+    mask_ctype = ctypes.c_ushort
+else:
+    mask_dtype = np.dtype(np.int16)
+    mask_ctype = ctypes.c_short
+    
 
 logger = logging.getLogger('DESImage')
 logger.addHandler(logging.StreamHandler())
@@ -306,6 +312,8 @@ class DESImage(DESDataImage):
                 filename, ext=ext, header=True)
         elif assign_default_mask:
             im.init_mask()
+        if im.mask is not None:
+            im.mask = localize_numpy_array(im.mask, new_dtype=mask_dtype)
 
         # Find and load the weight HDU
 
@@ -796,7 +804,7 @@ class DESImageCStruct(ctypes.Structure):
         # Set the call signature according to what we have, and call
         if isinstance(im, DESBPMImage):
             set_bpm_desimage.argtypes = [
-                np.ctypeslib.ndpointer(ctypes.c_short, ndim=2, shape=im_shape,
+                np.ctypeslib.ndpointer(mask_ctype, ndim=2, shape=im_shape,
                                        flags = npflags),
                 ctypes.POINTER(DESImageCStruct)
             ]
@@ -812,7 +820,7 @@ class DESImageCStruct(ctypes.Structure):
             set_weightless_desimage.argtypes = [
                 np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
                                        flags = npflags),
-                np.ctypeslib.ndpointer(ctypes.c_short, ndim=2, shape=im_shape,
+                np.ctypeslib.ndpointer(mask_ctype, ndim=2, shape=im_shape,
                                        flags = npflags),
                 ctypes.POINTER(DESImageCStruct)
             ]
@@ -823,7 +831,7 @@ class DESImageCStruct(ctypes.Structure):
                                        flags = npflags),
                 np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
                                        flags = npflags),
-                np.ctypeslib.ndpointer(ctypes.c_short, ndim=2, shape=im_shape,
+                np.ctypeslib.ndpointer(mask_ctype, ndim=2, shape=im_shape,
                                        flags = npflags),
                 ctypes.POINTER(DESImageCStruct)
             ]
