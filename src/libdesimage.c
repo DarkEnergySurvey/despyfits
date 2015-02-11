@@ -29,3 +29,10 @@ int set_weightless_desimage(float *image, short *mask, desimage *di) {
   return(0);
 }
 
+int set_bpm_desimage(short *bpm, desimage *di) {
+  di->image = NULL;
+  di->varim = NULL;
+  di->mask = bpm;
+  return(0);
+}
+
