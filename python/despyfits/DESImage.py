@@ -18,6 +18,7 @@ import numpy as np
 import fitsio
 from fitsio import FITSHDR
 from despyfits import maskbits
+from despyfits.DESFITSInventory import DESFITSInventory
 
 # constants
 
@@ -28,6 +29,8 @@ mask_dtype = np.dtype(np.int16)
 weight_dtype = np.dtype(np.float32)
 data_dtype = np.dtype(np.float32)
 pass_fortran = False
+
+# IGNORED_HDR_KWDS = ['NAXIS1','NAXIS2']
 
 logger = logging.getLogger('DESImage')
 logger.addHandler(logging.StreamHandler())
@@ -64,6 +67,15 @@ class BadFITSSectionSpec(Exception):
     def __str__(self):
         return repr(self.value)
 
+class TooManyDataHDUs(Exception):
+    pass
+
+class TooManyMaskHDUs(Exception):
+    pass
+
+class TooManyWeightHDUs(Exception):
+    pass
+
 # interface functions
 # classes
 
@@ -98,8 +110,20 @@ class HeaderDifference(object):
             s += "       im2=>" + str(self.diff[k][1]) + "<=\n"
         return s
 
-class DESDataImage(object):
+class DESSingleImage(object):
 
+    # If we index this object, assume we are after keywords in the header
+    def __getitem__(self, key):
+        if key in self.header.keys():
+            return self.header[key]
+        else:
+            return self.pri_hdr[key]
+
+    def __setitem__(self, key, value):
+        self.header[key] = value
+
+
+class DESDataImage(DESSingleImage):
 
     def __init__(self, data, header={}, pri_hdr=None):
         """Create a new DESDataImage
@@ -162,16 +186,6 @@ class DESDataImage(object):
                     fits.create_image_hdu(self.data)
                 fits.write(self.data, header=self.header, ext=ext, clobber=True)
             
-    # If we index this object, assume we are after keywords in the header
-    def __getitem__(self, key):
-        if key in self.header.keys():
-            return self.header[key]
-        else:
-            return self.pri_hdr[key]
-
-    def __setitem__(self, key, value):
-        self.header[key] = value
-
 
     @property
     def cstruct(self):
@@ -245,55 +259,72 @@ class DESImage(DESDataImage):
     @classmethod
     def load(cls, filename, 
              assign_default_mask=True, 
-             assign_default_weight=True):
+             assign_default_weight=True,
+             ccdnum=None):
         """Load from a FITS file
 
         :Parameters:
             - `filename`: the name of the FITS file from which to load
             - `assign_default_mask`: create a default empty mask if none present
             - `assign_default_weight`: create default weights if none present
+            - `ccdnum`: which CCD
 
         @returns: a new DESImage object with data from the FITS file
         """
-        if image_hdu is None:
-            data_hdu = 1 if filename.endswith('.fz') else 0
+        fits_inventory = DESFITSInventory(filename)
+
+
+        # Find and load the data HDU
+
+        data_hdus = fits_inventory.scis
+        if ccdnum is not None:
+            ccd_hdus = set(fits_inventory.ccd_hdus(ccdnum))
+            data_hdus = sorted(set(data_hdus) & ccd_hdus)
+        
+        if len(data_hdus)==0:
+            data_hdus = fits_inventory.raws
+            if ccdnum is not None:
+                data_hdus = sorted(set(data_hdus) & ccd_hdus)
+
+        # Create the new object
+        if len(data_hdus)>0:
+            ext = data_hdus[0]
+            data_im = DESDataImage.load(filename, image_hdu=ext)
+            im = cls(data_im)
         else:
-            data_hdu = image_hdu
+            im = cls()
+            im.pri_hdr = fits_inventory.hdr[0]
 
-        data_im = DESDataImage.load(filename)
-        im = cls.create(data_im)
 
-        found_mask, found_weight = False, False
-        for ext in sorted(set((mask_hdu, weight_hdu, 0, 1, 2))):
-            try:
-                data, hdr = fitsio.read(filename, ext=ext+data_hdu, header=True)
-            except ValueError:
-                # we probably don't have all HDUs
-                break
+        # Find and load the mask HDU
 
-            def is_hdr_type(name1, name2):
-                kv_pairs = (('DES_EXT', name1),
-                            ('EXTNAME', name2))
-                for key, value in kv_pairs:
-                    if key in hdr.keys():
-                        if hdr[key].rstrip()==value:
-                            return True
-                return False
-
-            if is_hdr_type('MASK', 'MSK') and not found_mask:
-                im.mask = localize_numpy_array(data, mask_dtype)
-                im.mask_hdr = hdr
-                found_mask = True
-            elif is_hdr_type('WEIGHT', 'WGT') and not found_weight:
-                im.weight = localize_numpy_array(data, weight_dtype)
-                im.weight_hdr = hdr
-                found_weight = True
-
-        if assign_default_mask and im.mask is None:
+        if len(fits_inventory.masks) > 1:
+            raise TooManyMaskHDUs
+        elif len(fits_inventory.masks) == 1:
+            ext = fits_inventory.masks[0]
+            im.mask, im.mask_hdr = fitsio.read(
+                filename, ext=ext, header=True)
+        elif assign_default_mask:
             im.init_mask()
-                
-        if assign_default_weight and im.weight is None:
+
+        # Find and load the weight HDU
+
+        if len(fits_inventory.weights) > 1:
+            raise TooManyWeightHDUs
+        elif len(fits_inventory.weights) == 1:
+            ext = fits_inventory.weights[0]
+            im.weight, im.weight_hdr = fitsio.read(
+                filename, ext=ext, header=True)
+        elif assign_default_weight:
             im.init_weight()
+
+        # Initialze the data if there isn't any yet
+        if im.data is None:
+            try:
+                shape = im.mask.shape
+            except AttributeError:
+                shape = im.weight.shape
+            im.data = np.zeros(shape, dtype=data_dtype)
 
         return im
 
@@ -453,6 +484,80 @@ class DESImage(DESDataImage):
         comparison = DESImageComparison(header_diff, diff_im)
         return comparison
 
+
+class DESBPMImage(DESSingleImage):
+
+    def __init__(self, bpm, header={}, pri_hdr=None):
+        """Create a new DESBPMImage
+
+        :Parameters:
+            - `bpm`: the numpy data array
+            - `header`: the header
+            - `pri_hdr`: the primary header of the FITS file
+
+        """
+        self.mask = bpm
+
+        if getattr(header, "add_record", None) is None:
+            self.header = FITSHDR(header)
+        else:
+            self.header = header
+
+        if pri_hdr is None:
+            self.pri_hdr = self.header
+
+        if getattr(pri_hdr, "add_record", None) is None:
+            self.pri_hdr = FITSHDR(pri_hdr)
+        else:
+            self.pri_hdr = pri_hdr
+
+    @classmethod
+    def load(cls, filename, bpm_hdu=None):
+        """Load from a FITS file
+
+        :Parameters:
+            - `filename`: the name of the FITS file from which to load
+            - `image_hdu`: the HDU index with the data image
+
+        """
+
+        if bpm_hdu is None:
+            fits_inventory = DESFITSInventory(filename)
+            hdus = fits_inventory.bpms
+            if len(hdus)>1:
+                raise TooManyMaskHDUs
+            ext = hdus[0]
+        else:
+            ext = dbm_hdu
+
+        data, header = fitsio.read(filename, ext=ext, header=True)
+
+        bpm = cls(data, header)
+        return bpm
+
+    def save(self, filename):
+        """Save to a FITS file
+
+        :Parameters:
+            - `filename`: the name of the FITS file
+        """
+        fitsio.write(filename, self.mask, header=self.header, 
+                     clobber=True)
+            
+    @property
+    def cstruct(self):
+        """Return a structure passable to C libraries using ctypes
+        """
+
+        if pass_fortran:
+            self.mask = np.asfortranarray(localize_numpy_array(self.mask, mask_dtype))
+        else:
+            self.mask = localize_numpy_array(self.mask, mask_dtype)
+
+        self._cstruct = DESImageCStruct(self)
+        return self._cstruct
+    
+
 # internal functions & classes
 
 DESImageComparisonNT = namedtuple('DESImageComparisonNT',
@@ -568,6 +673,7 @@ except KeyError:
 
 set_desimage = libdesimage.set_desimage
 set_data_desimage = libdesimage.set_data_desimage
+set_bpm_desimage = libdesimage.set_bpm_desimage
 set_weightless_desimage = libdesimage.set_weightless_desimage
 CCDNUM2 = ctypes.c_int.in_dll(libdesimage, 'ccdnum2').value
 
@@ -610,8 +716,12 @@ class DESImageCStruct(ctypes.Structure):
             self.npixels = 0
 
     def create(self, im, data_only=False, weightless=False):
-        im_shape = im.data.shape
-        self.npixels = im.data.size
+        if isinstance(im, DESBPMImage):
+            im_shape = im.mask.shape
+            self.npixels = im.mask.size            
+        else:
+            im_shape = im.data.shape
+            self.npixels = im.data.size
         self.axes = SevenLongs(im_shape[1], im_shape[0], 0, 0, 0, 0, 0)
 
         try:
@@ -648,6 +758,12 @@ class DESImageCStruct(ctypes.Structure):
         set_desimage.restype = ctypes.c_int
 
         try:
+            has_data = im.data is not None
+        except AttributeError:
+            has_data = False
+
+
+        try:
             has_mask = im.mask is not None
         except AttributeError:
             has_mask = False
@@ -659,7 +775,8 @@ class DESImageCStruct(ctypes.Structure):
 
         # Test and correct data types if necessary
 
-        im.data = localize_numpy_array(im.data, data_dtype)
+        if has_data:
+            im.data = localize_numpy_array(im.data, data_dtype)
 
         if has_mask:
             im.mask = localize_numpy_array(im.mask, mask_dtype)
@@ -668,7 +785,8 @@ class DESImageCStruct(ctypes.Structure):
             im.weight = localize_numpy_array(im.weight, weight_dtype)
 
         if pass_fortran:
-            im.data = np.asfortranarray(im.data)
+            if has_data:
+                im.data = np.asfortranarray(im.data)
             if has_mask:
                 im.mask = np.asfortranarray(im.mask)
             if has_weight:
@@ -676,8 +794,14 @@ class DESImageCStruct(ctypes.Structure):
 
 
         # Set the call signature according to what we have, and call
-
-        if not (has_mask or has_weight):
+        if isinstance(im, DESBPMImage):
+            set_bpm_desimage.argtypes = [
+                np.ctypeslib.ndpointer(ctypes.c_short, ndim=2, shape=im_shape,
+                                       flags = npflags),
+                ctypes.POINTER(DESImageCStruct)
+            ]
+            set_bpm_desimage(im.mask, ctypes.byref(self))
+        elif not (has_mask or has_weight):
             set_data_desimage.argtypes = [
                 np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
                                        flags = npflags),
