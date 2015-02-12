@@ -295,8 +295,9 @@ class DESImage(DESDataImage):
         # Create the new object
         if len(data_hdus)>0:
             ext = data_hdus[0]
+            logger.info("Loading data from HDU %d" % ext)
             data_im = DESDataImage.load(filename, image_hdu=ext)
-            im = cls(data_im)
+            im = cls.create(data_im)
         else:
             im = cls()
             im.pri_hdr = fits_inventory.hdr[0]
@@ -308,6 +309,7 @@ class DESImage(DESDataImage):
             raise TooManyMaskHDUs
         elif len(fits_inventory.masks) == 1:
             ext = fits_inventory.masks[0]
+            logger.info("Loading mask from HDU %d" % ext)
             im.mask, im.mask_hdr = fitsio.read(
                 filename, ext=ext, header=True)
         elif assign_default_mask:
@@ -321,6 +323,7 @@ class DESImage(DESDataImage):
             raise TooManyWeightHDUs
         elif len(fits_inventory.weights) == 1:
             ext = fits_inventory.weights[0]
+            logger.info("Loading weights from HDU %d" % ext)
             im.weight, im.weight_hdr = fitsio.read(
                 filename, ext=ext, header=True)
         elif assign_default_weight:
@@ -438,7 +441,7 @@ class DESImage(DESDataImage):
                 else:
                     self.mask_hdr['DES_EXT']='MASK'
                 
-                fits[mask_hdu].write(self.mask)
+
                 fits[mask_hdu].write_keys(self.mask_hdr)
 
             if save_weight:
