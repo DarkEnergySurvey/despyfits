@@ -1,33 +1,32 @@
 #!/usr/bin/env python
 """Class to manage all images in a focal plane
 """
-from despyfits.DESImage import DESDataImage, DESImage, DESImageCStruct, CCDNUM2
+from despyfits.DESImage import DESDataImage, DESImage, DESImageCStruct
+from despyfits.DESImage import CCDNUM2, data_dtype
+from despyfits.DESFITSInventory import DESFITSInventory
 from fitsio import FITS
+import numpy as np
 
 FocalPlaneCStructArray = DESImageCStruct * CCDNUM2
 
 class DESFocalPlaneImages(object):
 
     def __init__(self, 
-                 init_data=False, init_mask=False, init_weight=False,
+                 init_data=False, 
                  shape=(4096, 2048)):
-        if init_data or init_mask or init_weight:
-            self.images = [DESDataImage(init_data=init_data,
-                                        init_maks=init_mask,
-                                        init_weight=init_weight,
-                                        shape=shape)
+        if init_data:
+            self.images = [DESDataImage(np.zeros(shape, dtype=data_dtype))
                            for i in range(CCDNUM2)]
 
     @classmethod
     def load(cls, fname):
-        fits = FITS(fname)
-        hdus_present = len(fits)
-        fits.close()
+        fits_inventory = DESFITSInventory(fname)
+        hdus_present = sorted(fits_inventory.raws)
 
         images = cls()
-
-        images.images = [DESDataImage.load(fname, ext)
-                         for ext in range(hdus_present)]
+        with FITS(fname) as fits:
+            images.images = [DESDataImage.load_from_open(fits, ext)
+                             for ext in hdus_present]
         return images
 
 

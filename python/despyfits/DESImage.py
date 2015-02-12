@@ -174,6 +174,21 @@ class DESDataImage(DESSingleImage):
         im = cls(data, header)
         return im
 
+    @classmethod
+    def load_from_open(cls, fits, image_hdu):
+        """Load from a FITS file
+
+        :Parameters:
+            - `filename`: the name of the FITS file from which to load
+            - `image_hdu`: the HDU index with the data image
+
+        """
+        header = fits[image_hdu].read_header()
+        data = fits[image_hdu].read()
+        pri_hdr = fits[0].read_header()
+        im = cls(data, header, pri_hdr)
+        return im
+
     def save(self, filename, ext=None):
         """Save to a FITS file
 
