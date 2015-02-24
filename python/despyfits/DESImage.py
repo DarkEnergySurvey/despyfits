@@ -39,7 +39,8 @@ else:
     
 
 logger = logging.getLogger('DESImage')
-logger.addHandler(logging.StreamHandler())
+if len(logger.handlers) < 0:
+    logger.addHandler(logging.StreamHandler())
  
 # exception classes
 
