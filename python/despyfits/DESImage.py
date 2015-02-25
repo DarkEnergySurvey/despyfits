@@ -689,6 +689,49 @@ def scan_fits_section(hdr, keyword):
     values = [int(s) for s in m.groups()]
     return values
 
+def section2slice(section, reorder=False):
+    """
+    Parse an IRAF/FITS section specification string and convert to a numpy slice
+    specification (2-element tuple of slices).  Converts from 1-indexed to 0-indexed,
+    end from last element to 1-past-last element, and swaps index order.
+
+    :Parameters:
+      - `section`: string-valued IRAF/FITS section specification
+      - `reorder`: if True, will swap start/stop to insure start<=stop.
+
+    :Returns:
+      - 2-element tuple of slices, which can index numpy arrays
+    """
+    pattern = r"\[(\d+):(\d+),(\d+):(\d+)\]"
+    m = re.match(pattern, section)
+    if len(m.groups()) != 4:
+        raise BadFITSSectionSpec("%s" % section)
+    values = [int(s) for s in m.groups()]
+    if reorder and values[1]<values[0]:
+        values[0],values[1] = values[1],values[0]
+    if reorder and values[3]<values[2]:
+        values[2],values[3] = values[3],values[2]
+        
+    return (slice(values[2]-1,values[3]),
+            slice(values[0]-1,values[1]))
+
+def slice2section(s):
+    """
+    Convert numpy 2d slice specification into an IRAF/FITS section specification string.
+    Converts from 0-indexed to 1-indexed, 1-past-last to last at end, and swaps index order.
+    Requires explicit non-negative start and stop values in the slice.  Only 
+
+    :Parameters:
+      - `s`: 2-element tuple of slices, which can index numpy arrays
+
+    :Returns:
+      - string-valued IRAF/FITS section specification
+    """
+    values = (s[1].start, s[1].stop, s[0].start, s[0].stop)
+    if None in values or np.any(np.array(values)<0):
+        raise BadFITSSectionSpec("Bad slice2section input: " + str(s)) 
+    return "[%d:%d,%d:%d]" % values
+
 lib_ext = {'Linux': 'so',
            'Darwin': 'dylib'}
 try:
