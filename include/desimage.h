@@ -16,6 +16,7 @@ typedef struct {
   float rdnoiseA;
   float rdnoiseB;
   float *image;
-  float *varim;
+  float *variance;
+  float *weight;
   short *mask;
 } desimage;

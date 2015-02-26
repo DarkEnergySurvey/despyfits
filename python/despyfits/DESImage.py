@@ -26,6 +26,7 @@ image_hdu = None
 mask_hdu = 1
 weight_hdu = 2
 weight_dtype = np.dtype(np.float32)
+variance_dtype = np.dtype(np.float32)
 data_dtype = np.dtype(np.float32)
 pass_fortran = False
 
@@ -244,6 +245,7 @@ class DESImage(DESDataImage):
         if init_weight:
             self.init_weight()
             
+        self.variance = None
         self.header = FITSHDR({})
         self.pri_hdr = self.header
         self.mask_hdr = FITSHDR({})
@@ -277,11 +279,30 @@ class DESImage(DESDataImage):
     def init_weight(self, weight=None):
         self.weight = weight.astype(weight_dtype) if weight is not None \
                       else np.ones_like(self.data, dtype=weight_dtype)
-        
+
+    def get_weight(self):
+        """Return a weight map, convernting from variance if necessary
+        """
+        if self.weight is None and self.variance is not None:
+            w = 1.0/self.variance
+            self.variance = None
+            self.weight = w
+        return self.weight
+
+    def get_variance(self):
+        """Return a variance map, concerting from weight if necessary
+        """
+        if self.variance is None and self.weight is not None:
+            v = 1.0/self.weight
+            self.weight = None
+            self.variance = v
+        return self.variance
+
     @classmethod
     def load(cls, filename, 
              assign_default_mask=True, 
              assign_default_weight=True,
+             wgt_is_variance=False,
              ccdnum=None):
         """Load from a FITS file
 
@@ -294,7 +315,6 @@ class DESImage(DESDataImage):
         @returns: a new DESImage object with data from the FITS file
         """
         fits_inventory = DESFITSInventory(filename)
-
 
         # Find and load the data HDU
 
@@ -340,8 +360,13 @@ class DESImage(DESDataImage):
         elif len(fits_inventory.weights) == 1:
             ext = fits_inventory.weights[0]
             logger.info("Loading weights from HDU %d" % ext)
-            im.weight, im.weight_hdr = fitsio.read(
-                filename, ext=ext, header=True)
+            if wgt_is_variance:
+                im.variance, im.weight_hdr = fitsio.read(
+                    filename, ext=ext, header=True)
+            else:
+                im.weight, im.weight_hdr = fitsio.read(
+                    filename, ext=ext, header=True)
+
         elif assign_default_weight:
             im.init_weight()
 
@@ -457,7 +482,7 @@ class DESImage(DESDataImage):
                 else:
                     self.mask_hdr['DES_EXT']='MASK'
                 
-
+                fits[mask_hdu].write(self.mask)
                 fits[mask_hdu].write_keys(self.mask_hdr)
 
             if save_weight:
@@ -742,9 +767,6 @@ except KeyError:
 
 
 set_desimage = libdesimage.set_desimage
-set_data_desimage = libdesimage.set_data_desimage
-set_bpm_desimage = libdesimage.set_bpm_desimage
-set_weightless_desimage = libdesimage.set_weightless_desimage
 CCDNUM2 = ctypes.c_int.in_dll(libdesimage, 'ccdnum2').value
 
 SevenLongs = ctypes.c_long * 7
@@ -772,7 +794,8 @@ class DESImageCStruct(ctypes.Structure):
         ('rdnoiseA', ctypes.c_float),
         ('rdnoiseB', ctypes.c_float),
         ('image', ctypes.POINTER(ctypes.c_float)),
-        ('varim', ctypes.POINTER(ctypes.c_float)),
+        ('variance', ctypes.POINTER(ctypes.c_float)),
+        ('weight', ctypes.POINTER(ctypes.c_float)),
         ('mask', ctypes.POINTER(ctypes.c_short))
     ]
 
@@ -781,14 +804,15 @@ class DESImageCStruct(ctypes.Structure):
             self.create(im)
         else:
             self.image = None
-            self.varim = None
+            self.variance = None
+            self.weight = None
             self.mask = None
             self.npixels = 0
 
-    def create(self, im, data_only=False, weightless=False):
+    def create(self, im):
         if isinstance(im, DESBPMImage):
             im_shape = im.mask.shape
-            self.npixels = im.mask.size            
+            self.npixels = im.mask.size
         else:
             im_shape = im.data.shape
             self.npixels = im.data.size
@@ -843,6 +867,11 @@ class DESImageCStruct(ctypes.Structure):
         except AttributeError:
             has_weight = False
 
+        try:
+            has_variance = im.variance is not None
+        except AttributeError:
+            has_variance = False
+
         # Test and correct data types if necessary
 
         if has_data:
@@ -854,6 +883,9 @@ class DESImageCStruct(ctypes.Structure):
         if has_weight:
             im.weight = localize_numpy_array(im.weight, weight_dtype)
 
+        if has_variance:
+            im.variance = localize_numpy_array(im.variance, variance_dtype)
+
         if pass_fortran:
             if has_data:
                 im.data = np.asfortranarray(im.data)
@@ -861,45 +893,34 @@ class DESImageCStruct(ctypes.Structure):
                 im.mask = np.asfortranarray(im.mask)
             if has_weight:
                 im.weight = np.asfortranarray(im.weight)
-
+            if has_variance:
+                im.variance = np.asfortranarray(im.variance)
 
         # Set the call signature according to what we have, and call
-        if isinstance(im, DESBPMImage):
-            set_bpm_desimage.argtypes = [
-                np.ctypeslib.ndpointer(mask_ctype, ndim=2, shape=im_shape,
-                                       flags = npflags),
-                ctypes.POINTER(DESImageCStruct)
-            ]
-            set_bpm_desimage(im.mask, ctypes.byref(self))
-        elif not (has_mask or has_weight):
-            set_data_desimage.argtypes = [
-                np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                       flags = npflags),
-                ctypes.POINTER(DESImageCStruct)
-            ]
-            set_data_desimage(im.data, ctypes.byref(self))
-        elif has_mask and not has_weight:
-            set_weightless_desimage.argtypes = [
-                np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                       flags = npflags),
-                np.ctypeslib.ndpointer(mask_ctype, ndim=2, shape=im_shape,
-                                       flags = npflags),
-                ctypes.POINTER(DESImageCStruct)
-            ]
-            set_weightless_desimage(im.data, im.mask, ctypes.byref(self))
-        else:
-            set_desimage.argtypes = [
-                np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                       flags = npflags),
-                np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                       flags = npflags),
-                np.ctypeslib.ndpointer(mask_ctype, ndim=2, shape=im_shape,
-                                       flags = npflags),
-                ctypes.POINTER(DESImageCStruct)
-            ]
-            set_desimage(im.data, im.weight, im.mask, ctypes.byref(self))
-            
 
+        set_desimage.argtypes = [
+            ctypes.POINTER(ctypes.c_float) if not has_data else 
+            np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
+                                   flags = npflags),
+            ctypes.POINTER(ctypes.c_float) if not has_variance else 
+            np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
+                                   flags = npflags),
+            ctypes.POINTER(ctypes.c_float) if not has_weight else 
+            np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
+                                   flags = npflags),
+            ctypes.POINTER(mask_ctype) if not has_mask else 
+            np.ctypeslib.ndpointer(mask_ctype, ndim=2, shape=im_shape,
+                                   flags = npflags),
+            ctypes.POINTER(DESImageCStruct)
+        ]
+
+        
+        set_desimage(im.data if has_data else None, 
+                     im.variance if has_variance else None, 
+                     im.weight if has_weight else None, 
+                     im.mask if has_mask else None, 
+                     ctypes.byref(self))
+            
 def localize_numpy_array(data, new_dtype=None):
     if new_dtype is None:
         native_dtype = data.dtype.newbyteorder('N')
