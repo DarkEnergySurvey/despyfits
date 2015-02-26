@@ -17,7 +17,7 @@ const_names = ("BADPIX_BPM",
                "BADPIX_SATURATE",
                "BADPIX_INTERP",
                "BADPIX_THRESHOLD",
-               "BADPIX_LOW",
+               "BADPIX_BADAMP",
                "BADPIX_CRAY",
                "BADPIX_STAR",
                "BADPIX_TRAIL",
@@ -25,7 +25,7 @@ const_names = ("BADPIX_BPM",
                "BADPIX_SSXTALK",
                "BADPIX_EDGE",
                "BADPIX_STREAK",
-               "BADPIX_FIX",
+               "BADPIX_SUSPECT",
                "BPMDEF_FLAT_MIN",
                "BPMDEF_FLAT_MAX",
                "BPMDEF_FLAT_MASK",
@@ -38,8 +38,11 @@ const_names = ("BADPIX_BPM",
                "BPMDEF_TAPE_BUMP",
                "BPMDEF_FUNKY_COL",
                "BPMDEF_WACKY_PIX",
-               "BPMDEF_GENERIC")
+               "BPMDEF_BADAMP")
 
 for name in const_names:
     value = ctypes.c_int.in_dll(libmaskbits, name.lower()).value
     exec(name + " = %d" % value)
+# !!! temporary:
+BADPIX_SUSPECT = BADPIX_FIX
+BADPIX_BADAMP = BADPIX_LOW

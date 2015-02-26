@@ -4,7 +4,8 @@
 #define BADPIX_INTERP 4	      /* interpolated pixel                        */
 #define BADPIX_THRESHOLD 0.10 /* pixels less than this fraction of sky     */
                               /* are filtered -- helps remove failed reads */
-#define BADPIX_LOW     8      /* too little signal- i.e. poor read         */
+#define BADPIX_BADAMP  8      /* Data from non-functional amplifier        */
+#define BADPIX_LOW     (BADPIX_BADAMP) /* too little signal- NOT IN USE    */
 #define BADPIX_CRAY   16      /* cosmic ray pixel                          */
 #define BADPIX_STAR   32      /* bright star pixel                         */
 #define BADPIX_TRAIL  64      /* bleed trail pixel                         */
@@ -15,7 +16,8 @@
                                                                      edges */
 #define BADPIX_STREAK 1024    /* pixel associated with satellite 
                                                    (meteor/ufo) streak     */
-#define BADPIX_FIX    2048    /* a bad pixel that was fixed                */
+#define BADPIX_SUSPECT 2048    /* nominally useful pixel but not perfect   */
+#define BADPIX_FIX    (BADPIX_SUSPECT)    /* a bad pixel that was fixed - DEPRECATED */
 
 /* define BPMDEF bit mappings (for BPM definition) */
 #define BPMDEF_FLAT_MIN 1     /* Pixels that are dull in the flats.        */
@@ -33,4 +35,5 @@
 #define BPMDEF_FUNKY_COL 1024 /* Columns with charge redistribution in sky 
                                                                 exposures. */
 #define BPMDEF_WACKY_PIX 2048 /* Outliers in stacked sky exposures.        */
-#define BPMDEF_GENERIC   4096 /* Generic (undifferentiated) bad pixel flag */
+#define BPMDEF_BADAMP    4096 /* Pixel on non-functional amplifier         */
+#define BPMDEF_GENERIC   (BPMDEF_BADAMP)/* Generic bad pixel flag - NOT IN USE*/
