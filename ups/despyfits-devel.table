@@ -1,16 +1,10 @@
 setupRequired(pyfits 3.3+1)
+#setupRequired(pyfits 3.0.8+13)
 envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envAppend(PATH, ${PRODUCT_DIR}/bin)
 
 # For development use these -- after doing "python setup.py build"
-envAppend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/build/temp.linux-x86_64-2.7/shlib)
+envAppend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/build/shlib)
 if (FLAVOR == DarwinX86 || FLAVOR == Darwin) {
-   envPrepend(DYLD_LIBRARY_PATH, ${PRODUCT_DIR}/build/temp.linux-x86_64-2.7/shlib)
+   envPrepend(DYLD_LIBRARY_PATH, ${PRODUCT_DIR}/build/shlib)
 }
-
-# For EUPS build scripts
-#envAppend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
-#if (FLAVOR == DarwinX86 || FLAVOR == Darwin) {
-#   envPrepend(DYLD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
-#}
-
