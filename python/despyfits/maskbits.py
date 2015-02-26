@@ -43,6 +43,3 @@ const_names = ("BADPIX_BPM",
 for name in const_names:
     value = ctypes.c_int.in_dll(libmaskbits, name.lower()).value
     exec(name + " = %d" % value)
-# !!! temporary:
-BADPIX_SUSPECT = BADPIX_FIX
-BADPIX_BADAMP = BADPIX_LOW
