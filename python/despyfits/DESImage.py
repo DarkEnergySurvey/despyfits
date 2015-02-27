@@ -402,7 +402,7 @@ class DESImage(DESDataImage):
             has_mask = False
 
         try:
-            has_weight = self.weight is not None
+            has_weight = self.get_weight() is not None
         except AttributeError:
             has_weight = False
 
