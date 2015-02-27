@@ -430,7 +430,13 @@ class DESImage(DESDataImage):
 
             # Make sure the file exists and has the expected HDUs
             # Create any HDUs that are needed but don't already exist
-            max_hdu = max([data_hdu, mask_hdu, weight_hdu])
+            hdu_list = [data_hdu]
+            if has_mask:
+                hdu_list.append(mask_hdu)
+            if has_weight:
+                hdu_list.append(weight_hdu)
+
+            max_hdu = max(hdu_list)
             max_init_hdu = len(fits) if file_exists else 0
 
             for hdu in range(max_init_hdu, max_hdu+1):
@@ -913,7 +919,6 @@ class DESImageCStruct(ctypes.Structure):
                                    flags = npflags),
             ctypes.POINTER(DESImageCStruct)
         ]
-
         
         set_desimage(im.data if has_data else None, 
                      im.variance if has_variance else None, 
