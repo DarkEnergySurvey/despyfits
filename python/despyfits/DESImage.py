@@ -300,8 +300,8 @@ class DESImage(DESDataImage):
 
     @classmethod
     def load(cls, filename, 
-             assign_default_mask=True, 
-             assign_default_weight=True,
+             assign_default_mask=False, 
+             assign_default_weight=False,
              wgt_is_variance=False,
              ccdnum=None):
         """Load from a FITS file

@@ -43,3 +43,17 @@ const_names = ("BADPIX_BPM",
 for name in const_names:
     value = ctypes.c_int.in_dll(libmaskbits, name.lower()).value
     exec(name + " = %d" % value)
+
+def parse_badpix_mask(input):
+    """
+    Utility routine that can take a string input that is either an integer, or a string
+    of the form "EDGE,BPM,SATURATE" that this routine will convert into the sum of
+    the appropriate BADPIX bits.  An exception will be raised if there are unknown values.
+    """
+    try:
+        out = int(input)
+    except ValueError:
+        out = type(BADPIX_BPM)(0)
+        for bit in input.split(','):
+            out |= eval('BADPIX_'+bit.strip())
+    return out
