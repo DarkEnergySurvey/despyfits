@@ -4,7 +4,7 @@
 extern const int badpix_bpm = BADPIX_BPM;
 extern const int badpix_saturate = BADPIX_SATURATE;
 extern const int badpix_interp = BADPIX_INTERP;
-extern const int badpix_threshold = BADPIX_THRESHOLD;
+extern const float badpix_threshold = BADPIX_THRESHOLD;
 /* extern const int badpix_low = BADPIX_LOW;   Should not be in use  */
 extern const int badpix_cray = BADPIX_CRAY;
 extern const int badpix_star = BADPIX_STAR;
