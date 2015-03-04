@@ -468,7 +468,7 @@ class DESImage(DESDataImage):
                         fits[data_hdu].write(self.data)
                         save_data = False
                 else:
-                    fits.create_image_hdu(self.data)
+                    fits.create_image_hdu(np.zeros((1,1)), extname='DUMMY')
 
             if save_data:
                 hdr = fits[data_hdu].read_header()
