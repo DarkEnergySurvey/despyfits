@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-# $Id: fitsutils.py 18485 2014-01-29 15:57:50Z mgower $
-# $Rev:: 18485                            $:  # Revision of last commit.
-# $LastChangedBy:: mgower                 $:  # Author of last commit.
-# $LastChangedDate:: 2014-01-29 09:57:50 #$:  # Date of last commit.
+# $Id$
+# $Rev::                                  $:  # Revision of last commit.
+# $LastChangedBy::                        $:  # Author of last commit.
+# $LastChangedDate::                      $:  # Date of last commit.
 
 import re
 import os
@@ -10,6 +10,7 @@ import sys
 import pyfits
 
 """ Miscellaneous generic support functions for fits files """
+
 
 class makeMEF(object):
 
@@ -42,8 +43,7 @@ class makeMEF(object):
 
         # Output file exits
         if os.path.isfile(self.outname) and self.clobber is False:
-            raise Warning("Output file exists, try --clobber option, no file was created")
-            return 1
+            sys.exit("ERROR: Output file exists, try --clobber")
         
         # Get the Pyfits version as a float
         self.pyfitsVersion = float(".".join(pyfits.__version__.split(".")[0:2]))
