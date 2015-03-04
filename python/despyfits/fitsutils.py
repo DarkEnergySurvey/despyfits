@@ -11,7 +11,6 @@ import pyfits
 
 """ Miscellaneous generic support functions for fits files """
 
-
 class makeMEF(object):
 
     """
@@ -43,7 +42,8 @@ class makeMEF(object):
 
         # Output file exits
         if os.path.isfile(self.outname) and self.clobber is False:
-            sys.exit("ERROR: Output file exists, try --clobber")
+            raise Warning("Output file exists, try --clobber option, no file was created")
+            return 1
         
         # Get the Pyfits version as a float
         self.pyfitsVersion = float(".".join(pyfits.__version__.split(".")[0:2]))
