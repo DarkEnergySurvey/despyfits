@@ -9,6 +9,8 @@ import os
 import sys
 import pyfits
 
+import despymisc.miscutils as miscutils
+
 """ Miscellaneous generic support functions for fits files """
 
 class makeMEF(object):
@@ -101,6 +103,41 @@ class makeMEF(object):
         print "# Writing to: %s" % self.outname
         newhdu.writeto(self.outname,clobber=self.clobber)
         return
+
+
+#######################################################################
+def combine_cats(incats, outcat):
+    """
+    Combine all input catalogs (each with 3 hdus) into a single fits file
+    """
+
+    # if incats is comma-separated list, split into python list 
+    comma_re = re.compile("\s*,\s*")
+    incat_lst = comma_re.split(incats)
+
+    miscutils.fwdebug(3, 'FITSUTILS_DEBUG', "Constructing hdulist object for single fits file")
+    # Construct hdulist object to append hdus from individual catalogs to
+    hdulist = pyfits.HDUList()
+
+    # Now append the hdus from each input catalog file to the hdulist
+    for incat in incat_lst:
+        miscutils.fwdebug(3, 'FITSUTILS_DEBUG', "Appending 3 HDUs from cat --> %s" % incat)
+        hdulist1 = pyfits.open(incat, mode='readonly')
+        hdulist.append(hdulist1[0])
+        hdulist.append(hdulist1[1])
+        hdulist.append(hdulist1[2])
+        #hdulist1.close()
+
+    # And write the full hdulist to the output file
+    if os.path.exists(outcat):
+        os.remove(outcat)
+        miscutils.fwdebug(0, 'FITSUTILS_DEBUG', "Removing pre-existing version of fullcat %s" % outcat)
+
+    miscutils.fwdebug(3, 'FITSUTILS_DEBUG', "Writing results to fullcat --> %s" % outcat)
+    hdulist.writeto(outcat)
+
+    miscutils.fwdebug(6, 'FITSUTILS_DEBUG', "Using fits_close to close fullcat --> %s" % outcat)
+    hdulist.close()
 
 
 
