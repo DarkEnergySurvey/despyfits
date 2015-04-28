@@ -33,7 +33,9 @@
 #define BPMDEF_EDGE      128  /* Pixels on the glowing edges of the CCD.   */
 #define BPMDEF_CORR      256  /* Correctable pixels (usually downstream of */
                               /*        hot pixels).                       */
-#define BPMDEF_TAPE_BUMP 512  /* Pixels that reside in tape bumps.         */
+#define BPMDEF_SUSPECT   512  /* Imperfect calibration or excess noise,    */
+                              /*        such as tape bumps.  Ignore for    */
+                              /*        highest-precision work.            */
 #define BPMDEF_FUNKY_COL 1024 /* Columns with charge redistribution in sky */ 
                               /*        exposures.                         */
 #define BPMDEF_WACKY_PIX 2048 /* Outliers in stacked sky exposures.        */
