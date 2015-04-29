@@ -1,5 +1,6 @@
 setupRequired(pyfits 3.3+2)
 setupRequired(fitsio 0.9.6+1)
+setupRequired(imsupport )
 envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envAppend(PATH, ${PRODUCT_DIR}/bin)
 

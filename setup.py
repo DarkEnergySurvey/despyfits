@@ -1,3 +1,4 @@
+import os 
 import distutils
 from distutils.core import setup
 import glob
@@ -16,9 +17,10 @@ libdesimage = SharedLibrary(
 libmaskbits = SharedLibrary(
     'maskbits', 
     sources = ['src/libmaskbits.c'],
-    include_dirs = ['include'],
+    include_dirs = ['include', '%s/include' % os.environ['IMSUPPORT_DIR']],
     extra_compile_args = ['-O3','-g','-Wall','-shared','-fPIC'])
- 
+
+
 # The main call
 setup(name='despyfits',
       version ='0.2.0',
