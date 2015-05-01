@@ -35,7 +35,7 @@ const_names = ("BADPIX_BPM",
                "BPMDEF_BIAS_COL",
                "BPMDEF_EDGE",
                "BPMDEF_CORR",
-               "BPMDEF_TAPE_BUMP",
+               "BPMDEF_SUSPECT",
                "BPMDEF_FUNKY_COL",
                "BPMDEF_WACKY_PIX",
                "BPMDEF_BADAMP")
