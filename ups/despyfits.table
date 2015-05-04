@@ -1,3 +1,4 @@
+setupRequired(shlib 2.1.11+1)
 setupRequired(pyfits 3.3+2)
 setupRequired(fitsio 0.9.6+1)
 # note... requires new imsupport!!! not yet a defined version
