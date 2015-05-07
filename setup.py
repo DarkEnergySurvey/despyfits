@@ -8,7 +8,7 @@ from shlib.build_shlib import SharedLibrary
 
 bin_files = glob.glob("bin/*.py") + glob.glob("bin/*.txt")
 inc_files = glob.glob("include/*.h") 
-#doc_files = glob.glob("doc/*.*")
+doc_files = glob.glob("doc/*.*")
 
 libdesimage = SharedLibrary(
     'desimage',
@@ -35,6 +35,7 @@ setup(name='despyfits',
       package_dir = {'': 'python'},
       scripts = bin_files,
       data_files=[('ups',['ups/despyfits.table']),
+                  ('doc', doc_files)],
                   ('include', inc_files)],
       )
 
