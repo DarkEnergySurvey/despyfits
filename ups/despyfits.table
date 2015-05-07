@@ -1,8 +1,10 @@
-setupRequired(shlib 2.1.11+1)
 setupRequired(pyfits 3.3+2)
 setupRequired(fitsio 0.9.6+1)
-# note... requires new imsupport!!! not yet a defined version
-#setupRequired(imsupport )
+
+# New dependencies
+setupRequired(shlib 2.1.11+1)
+setupRequired(imsupport 7.2.0+3)
+
 envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envAppend(PATH, ${PRODUCT_DIR}/bin)
 
@@ -11,12 +13,4 @@ envAppend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
 if (FLAVOR == DarwinX86 || FLAVOR == Darwin) {
    envPrepend(DYLD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
 }
-
-## For development use these -- after doing "python setup.py build"
-#envAppend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/build/temp.linux-x86_64-2.7/shlib)
-#if (FLAVOR == DarwinX86 || FLAVOR == Darwin) {
-#   envPrepend(DYLD_LIBRARY_PATH, ${PRODUCT_DIR}/build/temp.linux-x86_64-2.7/shlib)
-#}
-
-
 
