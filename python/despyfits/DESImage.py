@@ -130,10 +130,18 @@ class DESSingleImage(object):
     def __setitem__(self, key, value):
         self.header[key] = value
 
+    def write_key(self, key, value, comment=None):
+        """
+        Add or alter a header keyword/value pair, with optional comment field
+        """
+        if comment is None:
+            self.header[key] = value
+        else:
+            self.header.add_record( {'name':key, 'value':value, 'comment':comment})
 
 class DESDataImage(DESSingleImage):
 
-    def __init__(self, data, header={}, pri_hdr=None):
+    def __init__(self, data, header={}, pri_hdr=None, sourcefile=None):
         """Create a new DESDataImage
 
         :Parameters:
@@ -143,6 +151,7 @@ class DESDataImage(DESSingleImage):
 
         """
         self.data = data
+        self.sourcefile = sourcefile
 
         if getattr(header, "add_record", None) is None:
             self.header = FITSHDR(header)
@@ -173,7 +182,7 @@ class DESDataImage(DESSingleImage):
 
         data, header = fitsio.read(filename, ext=ext, header=True)
 
-        im = cls(data, header)
+        im = cls(data, header, sourcefile=filename)
         return im
 
     @classmethod
@@ -181,7 +190,7 @@ class DESDataImage(DESSingleImage):
         """Load from a FITS file
 
         :Parameters:
-            - `filename`: the name of the FITS file from which to load
+            - `fits`: an already-opened FITS object
             - `image_hdu`: the HDU index with the data image
 
         """
@@ -209,6 +218,23 @@ class DESDataImage(DESSingleImage):
                     fits.create_image_hdu(self.data)
                 fits.write(self.data, header=self.header, ext=ext, clobber=True)
             
+    def copy_header_info(self, source, keywords, require=False):
+        """
+        Copy keyword/value pairs from source into header of this object.
+        :Parameters:
+            - `source`: source of key/value pairs with dict-like behavior
+            - `keywords`: iterable list of the keywords to copy from source
+            - `require`: if True, exception is generated if a desired keyword is
+                         absent from source.
+        """
+        for kw in keywords:
+            try:
+                value = source[kw]
+                self.header[kw] = value
+            except (ValueError,KeyError):
+                if require:
+                    raise KeyError('copy_header_info did not find required keyword ' + kw)
+        return
 
     @property
     def cstruct(self):
@@ -226,7 +252,7 @@ class DESDataImage(DESSingleImage):
 class DESImage(DESDataImage):
 
     def __init__(self, init_data=False, init_mask=False, init_weight=False,
-                 shape=(4096, 2048)):
+                 shape=(4096, 2048), sourcefile=None):
         """Create a new DESImage
 
         Create an empty DESImage
@@ -250,6 +276,7 @@ class DESImage(DESDataImage):
         self.pri_hdr = self.header
         self.mask_hdr = FITSHDR({})
         self.weight_hdr = FITSHDR({})
+        self.sourcefile = sourcefile
 
     @classmethod
     def create(cls, data_im, mask=None, weight=None):
@@ -338,6 +365,7 @@ class DESImage(DESDataImage):
             im = cls()
             im.pri_hdr = fits_inventory.hdr[0]
 
+        im.sourcefile = filename
 
         # Find and load the mask HDU
 
@@ -545,7 +573,7 @@ class DESImage(DESDataImage):
 
 class DESBPMImage(DESSingleImage):
 
-    def __init__(self, bpm, header={}, pri_hdr=None):
+    def __init__(self, bpm, header={}, pri_hdr=None, sourcefile=None):
         """Create a new DESBPMImage
 
         :Parameters:
@@ -555,6 +583,7 @@ class DESBPMImage(DESSingleImage):
 
         """
         self.mask = bpm
+        self.sourcefile = sourcefile
 
         if getattr(header, "add_record", None) is None:
             self.header = FITSHDR(header)
@@ -590,7 +619,7 @@ class DESBPMImage(DESSingleImage):
 
         data, header = fitsio.read(filename, ext=ext, header=True)
 
-        bpm = cls(data, header)
+        bpm = cls(data, header, sourcefile=filename)
         return bpm
 
     def save(self, filename):

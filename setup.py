@@ -1,3 +1,4 @@
+import os 
 import distutils
 from distutils.core import setup
 import glob
@@ -6,6 +7,8 @@ import shlib
 from shlib.build_shlib import SharedLibrary
 
 bin_files = glob.glob("bin/*.py") + glob.glob("bin/*.txt")
+inc_files = glob.glob("include/*.h") 
+doc_files = glob.glob("doc/*.*")
 
 libdesimage = SharedLibrary(
     'desimage',
@@ -16,12 +19,13 @@ libdesimage = SharedLibrary(
 libmaskbits = SharedLibrary(
     'maskbits', 
     sources = ['src/libmaskbits.c'],
-    include_dirs = ['include'],
+    include_dirs = ['include', '%s/include' % os.environ['IMSUPPORT_DIR']],
     extra_compile_args = ['-O3','-g','-Wall','-shared','-fPIC'])
- 
+
+
 # The main call
 setup(name='despyfits',
-      version ='0.2.0',
+      version ='0.2.2',
       license = "GPL",
       description = "A set of handy Python fitsfile-related utility functions for DESDM",
       author = "Felipe Menanteau, Eric Neilsen",
@@ -30,6 +34,8 @@ setup(name='despyfits',
       packages = ['despyfits'],
       package_dir = {'': 'python'},
       scripts = bin_files,
-      data_files=[('ups',['ups/despyfits.table'])],
+      data_files=[('ups',['ups/despyfits.table']),
+                  ('doc', doc_files),
+                  ('include', inc_files)],
       )
 

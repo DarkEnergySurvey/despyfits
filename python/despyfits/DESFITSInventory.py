@@ -47,7 +47,8 @@ class DESFITSInventory(object):
     def type_matches(self, extname_value, des_ext_value):
         extname_matches = self.hdr_keyword_matches('EXTNAME', extname_value)
         des_ext_matches = self.hdr_keyword_matches('DES_EXT', des_ext_value)
-        matching_hdus = sorted(set(extname_matches) & set(des_ext_matches))
+        ## matching_hdus = sorted(set(extname_matches) & set(des_ext_matches))
+        matching_hdus = sorted(set(extname_matches) | set(des_ext_matches))
         return matching_hdus
 
     @property
