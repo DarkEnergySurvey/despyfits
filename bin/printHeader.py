@@ -17,7 +17,7 @@ from pyfits import getheader
 def print_header(fitsfile,ofileh=sys.stdout):
     """ print header from fits file to either stdout or to a file """
     hdr = getheader(fitsfile)
-    ofileh.write("%s" % hdr.ascardlist())
+    ofileh.write("%s" % hdr.ascard)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Prints fits headers')
