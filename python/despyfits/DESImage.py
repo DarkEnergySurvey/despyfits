@@ -30,7 +30,7 @@ variance_dtype = np.dtype(np.float32)
 data_dtype = np.dtype(np.float32)
 pass_fortran = False
 
-mask_is_unsigned = True
+mask_is_unsigned = False
 if mask_is_unsigned:
     mask_dtype = np.dtype(np.uint16)
     mask_ctype = ctypes.c_ushort
