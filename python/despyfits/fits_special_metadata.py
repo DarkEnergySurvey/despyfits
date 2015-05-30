@@ -8,9 +8,7 @@
 Specialized functions for computing metadata
 """
 
-import calendar
-import re
-
+import pyfits
 import despyfits.fitsutils as fitsutils
 import despymisc.create_special_metadata as spmeta
 
@@ -26,21 +24,21 @@ def func_band(filename, hdulist=None, whichhdu=None):
     """ Create band from the filter keyword """
 
     if hdulist is None:
-        hdulist = fits_open(filename, 'readonly')
+        hdulist = pyfits.open(filename, 'readonly')
 
-    filter = fitsutils.get_hdr_value(hdulist, 'FILTER') 
-    return spmeta.create_band(filter)
+    filterval = fitsutils.get_hdr_value(hdulist, 'FILTER', whichhdu)
+    return spmeta.create_band(filterval)
 
 
 ######################################################################
 def func_camsym(filename, hdulist=None, whichhdu=None):
     """ Create camsys from the INSTRUME keyword """
     if hdulist is None:
-        hdulist = fits_open(filnam,'readonly')
+        hdulist = pyfits.open(filename, 'readonly')
 
-    instrume = fitsutils.get_hdr_value(hdulist, 'INSTRUME')
-    
-    return spmeta.create_camsym(intrume)
+    instrume = fitsutils.get_hdr_value(hdulist, 'INSTRUME', whichhdu)
+
+    return spmeta.create_camsym(instrume)
 
 
 ######################################################################
@@ -48,9 +46,9 @@ def func_nite(filename, hdulist=None, whichhdu=None):
     """ Create nite from the DATE-OBS keyword """
 
     if hdulist is None:
-        hdulist = fits_open(filename, 'readonly')
+        hdulist = pyfits.open(filename, 'readonly')
 
-    date_obs = fitsutils.get_hdr_value(hdulist, 'DATE-OBS')
+    date_obs = fitsutils.get_hdr_value(hdulist, 'DATE-OBS', whichhdu)
     return spmeta.create_nite(date_obs)
 
 
@@ -59,9 +57,9 @@ def func_objects(filename, hdulist=None, whichhdu=None):
     """ return the number of objects in fits catalog """
 
     if hdulist is None:
-        hdulist = fits_open(filename, 'readonly')
+        hdulist = pyfits.open(filename, 'readonly')
 
-    objects = fitsutils.get_hdr_value(hdulist, 'NAXIS2', 'LDAC_OBJECTS')
+    objects = fitsutils.get_hdr_value(hdulist, 'NAXIS2', whichhdu)
 
     return objects
 
@@ -71,11 +69,11 @@ def func_field(filename, hdulist=None, whichhdu=None):
     """ return the field from OBJECT fits header value """
 
     if hdulist is None:
-        hdulist = fits_open(filename, 'readonly')
+        hdulist = pyfits.open(filename, 'readonly')
 
     try:
-        object = fitsutils.get_hdr_value(hdulist, 'OBJECT')
+        objectval = fitsutils.get_hdr_value(hdulist, 'OBJECT', whichhdu)
     except:
-        object = fitsutils.get_hdr_value(hdulist, 'OBJECT', 'LDAC_IMHEAD')
+        objectval = fitsutils.get_hdr_value(hdulist, 'OBJECT', 'LDAC_IMHEAD')
 
-    return spmeta.create_field(object)
+    return spmeta.create_field(objectval)
