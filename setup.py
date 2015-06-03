@@ -25,7 +25,7 @@ libmaskbits = SharedLibrary(
 
 # The main call
 setup(name='despyfits',
-      version ='0.2.2',
+      version ='0.2.4',
       license = "GPL",
       description = "A set of handy Python fitsfile-related utility functions for DESDM",
       author = "Felipe Menanteau, Eric Neilsen",
