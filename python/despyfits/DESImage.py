@@ -12,6 +12,9 @@ import platform
 import ctypes
 import re
 from collections import namedtuple
+from tempfile import mkdtemp
+from os import path
+import shutil
 
 import numpy as np
 
@@ -29,6 +32,8 @@ weight_dtype = np.dtype(np.float32)
 variance_dtype = np.dtype(np.float32)
 data_dtype = np.dtype(np.float32)
 pass_fortran = False
+use_indirect_write = True
+indirect_write_prefix = '/tmp/desimage-'
 
 mask_is_unsigned = False
 if mask_is_unsigned:
@@ -37,12 +42,12 @@ if mask_is_unsigned:
 else:
     mask_dtype = np.dtype(np.int16)
     mask_ctype = ctypes.c_short
-    
+
 
 logger = logging.getLogger('DESImage')
 if len(logger.handlers) < 0:
     logger.addHandler(logging.StreamHandler())
- 
+
 # exception classes
 
 class MissingData(Exception):
@@ -85,13 +90,50 @@ class TooManyWeightHDUs(Exception):
     pass
 
 # interface functions
+
+# decorators
+
+def indirect_write(fname_idx):
+    # fname_idx indicate which argument of the wrapped
+    # method specifices the filename
+    def wrap(fn):
+        def writeme(*param_tuple, **kwds_dict):
+            if not use_indirect_write:
+                return fn(*param_tuple, **kwds_dict)
+
+            param_list = list(param_tuple)
+            dest_fname = param_tuple[fname_idx]
+            tmp_dir = mkdtemp(prefix=indirect_write_prefix)
+            tmp_fname = path.join(tmp_dir, path.basename(dest_fname))
+            param_list[fname_idx] = tmp_fname
+            param_tuple = tuple(param_list)
+            try:
+                # If the file exists and we are trying to update it
+                # we need to copy the file
+                shutil.copy2(dest_fname, tmp_fname)
+            except IOError:
+                pass
+
+            try:
+                # Do it
+                result = fn(*param_tuple, **kwds_dict)
+                shutil.move(tmp_fname, dest_fname)
+                shutil.rmtree(tmp_dir)
+                return result
+            except:
+                # If we fail, we need to clean up after ourselves
+                shutil.rmtree(tmp_dir)
+                raise
+        return writeme
+    return wrap
+
 # classes
 
 class HeaderDifference(object):
     def __init__(self, im1, im2):
         self.match = {}
         self.diff = {}
-                        
+
         for k in set(im1.header.keys()) | set(im2.header.keys()):
             if len(k)>8:
                 # Invalid FITS keyword
@@ -103,8 +145,8 @@ class HeaderDifference(object):
                 v[0] = im1.header[k]
             if k in im2.header.keys():
                 v[1] = im2.header[k]
-            
-                        
+
+
             if not v[0]==v[1]:
                 self.diff[k] = v
             else:
@@ -200,6 +242,7 @@ class DESDataImage(DESSingleImage):
         im = cls(data, header, pri_hdr)
         return im
 
+    @indirect_write(1)
     def save(self, filename, ext=None):
         """Save to a FITS file
 
@@ -210,14 +253,14 @@ class DESDataImage(DESSingleImage):
 
         """
         if ext is None:
-            fitsio.write(filename, self.data, header=self.header, 
+            fitsio.write(filename, self.data, header=self.header,
                          clobber=True)
         else:
             with fitsio.FITS(filename, fitsio.READWRITE) as fits:
                 while len(fits) <= ext:
                     fits.create_image_hdu(self.data)
                 fits.write(self.data, header=self.header, ext=ext, clobber=True)
-            
+
     def copy_header_info(self, source, keywords, require=False):
         """
         Copy keyword/value pairs from source into header of this object.
@@ -257,7 +300,7 @@ class DESImage(DESDataImage):
 
         Create an empty DESImage
 
-        In mast cases, DESImage.create or DESImage.load will be safer 
+        In mast cases, DESImage.create or DESImage.load will be safer
         and more covenient.
         """
 
@@ -270,7 +313,7 @@ class DESImage(DESDataImage):
         self.weight = None
         if init_weight:
             self.init_weight()
-            
+
         self.variance = None
         self.header = FITSHDR({})
         self.pri_hdr = self.header
@@ -326,8 +369,8 @@ class DESImage(DESDataImage):
         return self.variance
 
     @classmethod
-    def load(cls, filename, 
-             assign_default_mask=False, 
+    def load(cls, filename,
+             assign_default_mask=False,
              assign_default_weight=False,
              wgt_is_variance=False,
              ccdnum=None):
@@ -349,7 +392,7 @@ class DESImage(DESDataImage):
         if ccdnum is not None:
             ccd_hdus = set(fits_inventory.ccd_hdus(ccdnum))
             data_hdus = sorted(set(data_hdus) & ccd_hdus)
-        
+
         if len(data_hdus)==0:
             data_hdus = fits_inventory.raws
             if ccdnum is not None:
@@ -408,13 +451,14 @@ class DESImage(DESDataImage):
 
         return im
 
+    @indirect_write(1)
     def save(self, filename, save_data=True, save_mask=None, save_weight=None):
         """Save to a FITS file
 
         If the file exists and only some of the FITS extensions need to be
         written, a little time can be saved by setting the save_xxx element(s)
         of those HDUs that need not be saved to False. By default, all are
-        written. 
+        written.
 
         :Parameters:
             - `filename`: the name of the FITS file
@@ -441,7 +485,7 @@ class DESImage(DESDataImage):
         save_weight = save_weight if save_weight is not None else has_weight
         if save_weight and not has_weight:
             raise MissingWeight
-        
+
         if image_hdu is None:
             data_hdu = 1 if filename.endswith('.fz') else 0
         else:
@@ -515,7 +559,7 @@ class DESImage(DESDataImage):
                         raise UnexpectedDesExt('mask not in expected HDU')
                 else:
                     self.mask_hdr['DES_EXT']='MASK'
-                
+
                 fits[mask_hdu].write(self.mask)
                 fits[mask_hdu].write_keys(self.mask_hdr)
 
@@ -549,7 +593,7 @@ class DESImage(DESDataImage):
 
         :Parameters:
             - `im`: the comparison image
-      
+
         @Returns: a difference image
 
         """
@@ -622,15 +666,16 @@ class DESBPMImage(DESSingleImage):
         bpm = cls(data, header, sourcefile=filename)
         return bpm
 
+    @indirect_write(1)
     def save(self, filename):
         """Save to a FITS file
 
         :Parameters:
             - `filename`: the name of the FITS file
         """
-        fitsio.write(filename, self.mask, header=self.header, 
+        fitsio.write(filename, self.mask, header=self.header,
                      clobber=True)
-            
+
     @property
     def cstruct(self):
         """Return a structure passable to C libraries using ctypes
@@ -643,7 +688,7 @@ class DESBPMImage(DESSingleImage):
 
         self._cstruct = DESImageCStruct(self)
         return self._cstruct
-    
+
 
 # internal functions & classes
 
@@ -660,17 +705,17 @@ class DESImageComparison(DESImageComparisonNT):
     def data_match(self):
         m = np.count_nonzero(self.diff_im.data) == 0
         return m
-                
+
     @property
     def mask_match(self):
         m = np.count_nonzero(self.diff_im.mask) == 0
         return m
-                
+
     @property
     def weight_match(self):
         m = np.count_nonzero(self.diff_im.weight) == 0
         return m
-              
+
     def match(self, ignore=set()):
         differing_keywords = self.mismatched_keywords - set(ignore)
 
@@ -681,9 +726,9 @@ class DESImageComparison(DESImageComparisonNT):
 
     def log(self, logger, ref):
         logger.debug('Image size: %d', self.diff_im.data.size)
-        logger.debug('Data differences: %d', 
+        logger.debug('Data differences: %d',
                      np.count_nonzero(self.diff_im.data))
-        logger.debug('Weight differences: %d', 
+        logger.debug('Weight differences: %d',
                      np.count_nonzero(self.diff_im.weight))
         logger.debug(
             'BADPIX_BPM differences: %d/%d',
@@ -736,9 +781,9 @@ class DESImageComparison(DESImageComparisonNT):
         logger.debug(
             'BADPIX_FIX differences: %d/%d',
             np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_FIX),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_FIX)) 
+            np.count_nonzero(ref.mask & maskbits.BADPIX_FIX))
 
-                 
+
 def scan_fits_section(hdr, keyword):
     str_value = hdr[keyword]
     pattern = r"\[(\d+):(\d+),(\d+):(\d+)\]"
@@ -771,7 +816,7 @@ def section2slice(section, reorder=False):
         values[0],values[1] = values[1],values[0]
     if reorder and values[3]<values[2]:
         values[2],values[3] = values[3],values[2]
-        
+
     return (slice(values[2]-1,values[3]),
             slice(values[0]-1,values[1]))
 
@@ -779,7 +824,7 @@ def slice2section(s):
     """
     Convert numpy 2d slice specification into an IRAF/FITS section specification string.
     Converts from 0-indexed to 1-indexed, 1-past-last to last at end, and swaps index order.
-    Requires explicit non-negative start and stop values in the slice.  Only 
+    Requires explicit non-negative start and stop values in the slice.  Only
 
     :Parameters:
       - `s`: 2-element tuple of slices, which can index numpy arrays
@@ -789,7 +834,7 @@ def slice2section(s):
     """
     values = (s[1].start, s[1].stop, s[0].start, s[0].stop)
     if None in values or np.any(np.array(values)<0):
-        raise BadFITSSectionSpec("Bad slice2section input: " + str(s)) 
+        raise BadFITSSectionSpec("Bad slice2section input: " + str(s))
     return "[%d:%d,%d:%d]" % values
 
 lib_ext = {'Linux': 'so',
@@ -934,27 +979,27 @@ class DESImageCStruct(ctypes.Structure):
         # Set the call signature according to what we have, and call
 
         set_desimage.argtypes = [
-            ctypes.POINTER(ctypes.c_float) if not has_data else 
+            ctypes.POINTER(ctypes.c_float) if not has_data else
             np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
                                    flags = npflags),
-            ctypes.POINTER(ctypes.c_float) if not has_variance else 
+            ctypes.POINTER(ctypes.c_float) if not has_variance else
             np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
                                    flags = npflags),
-            ctypes.POINTER(ctypes.c_float) if not has_weight else 
+            ctypes.POINTER(ctypes.c_float) if not has_weight else
             np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
                                    flags = npflags),
-            ctypes.POINTER(mask_ctype) if not has_mask else 
+            ctypes.POINTER(mask_ctype) if not has_mask else
             np.ctypeslib.ndpointer(mask_ctype, ndim=2, shape=im_shape,
                                    flags = npflags),
             ctypes.POINTER(DESImageCStruct)
         ]
-        
-        set_desimage(im.data if has_data else None, 
-                     im.variance if has_variance else None, 
-                     im.weight if has_weight else None, 
-                     im.mask if has_mask else None, 
+
+        set_desimage(im.data if has_data else None,
+                     im.variance if has_variance else None,
+                     im.weight if has_weight else None,
+                     im.mask if has_mask else None,
                      ctypes.byref(self))
-            
+
 def localize_numpy_array(data, new_dtype=None):
     if new_dtype is None:
         native_dtype = data.dtype.newbyteorder('N')
