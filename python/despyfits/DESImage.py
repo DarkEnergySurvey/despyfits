@@ -15,6 +15,7 @@ from collections import namedtuple
 from tempfile import mkdtemp
 from os import path
 import shutil
+import os
 
 import numpy as np
 
@@ -32,7 +33,7 @@ weight_dtype = np.dtype(np.float32)
 variance_dtype = np.dtype(np.float32)
 data_dtype = np.dtype(np.float32)
 pass_fortran = False
-use_indirect_write = True
+use_indirect_write = False
 indirect_write_prefix = '/tmp/desimage-'
 
 mask_is_unsigned = False
@@ -493,10 +494,9 @@ class DESImage(DESDataImage):
 
         try:
             with fitsio.FITS(filename, fitsio.READONLY) as fits:
-                pass
-            file_exists = True
-        except ValueError:
-            file_exists = False
+                max_init_hdu = len(fits)
+        except:
+            max_init_hdu = 0
 
         with fitsio.FITS(filename, fitsio.READWRITE) as fits:
 
@@ -509,7 +509,6 @@ class DESImage(DESDataImage):
                 hdu_list.append(weight_hdu)
 
             max_hdu = max(hdu_list)
-            max_init_hdu = len(fits) if file_exists else 0
 
             for hdu in range(max_init_hdu, max_hdu+1):
                 if has_mask and hdu==mask_hdu:
