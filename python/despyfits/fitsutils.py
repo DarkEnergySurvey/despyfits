@@ -35,6 +35,7 @@ class makeMEF(object):
         self.outname   = kwargs.pop('outname',False)
         self.clobber   = kwargs.pop('clobber',False)
         self.extnames  = kwargs.pop('extnames',None)
+        self.verb      = kwargs.pop('verb',False)
 
         # Make sure that filenames and outname are defined
         if not self.filenames: sys.exit("ERROR: must provide input file names")
@@ -42,8 +43,8 @@ class makeMEF(object):
 
         # Output file exits
         if os.path.isfile(self.outname) and self.clobber is False:
-            raise Warning("Output file exists, try --clobber option, no file was created")
-            return 1
+            print " [WARNING]: Output file exists, try --clobber option, no file was created"
+            return
         
         # Get the Pyfits version as a float
         self.pyfitsVersion = float(".".join(pyfits.__version__.split(".")[0:2]))
@@ -66,7 +67,7 @@ class makeMEF(object):
         k = 0
         for extname,hdu in zip(self.extnames,self.HDU):
 
-            print "# Adding EXTNAME=%s to HDU %s" % (extname,k)
+            if self.verb: print "# Adding EXTNAME=%s to HDU %s" % (extname,k)
             # Method for pyfits < 3.1
             if self.pyfitsVersion < 3.1: 
                 hdu[0].header.update('EXTNAME',extname, 'Extension Name' ,after='NAXIS2')
@@ -86,7 +87,7 @@ class makeMEF(object):
         self.HDU = []
         k = 0
         for fname in self.filenames:
-            print "# Reading %s --> HDU %s" % (fname,k)
+            if self.verb: print "# Reading %s --> HDU %s" % (fname,k)
             self.HDU.append(pyfits.open(fname))
             k = k + 1
         return
@@ -98,7 +99,7 @@ class makeMEF(object):
 
         for hdu in self.HDU:
             newhdu.append(hdu[0])# ,hdu[0].header)
-        print "# Writing to: %s" % self.outname
+        if self.verb: print "# Writing to: %s" % self.outname
         newhdu.writeto(self.outname,clobber=self.clobber)
         return
 
