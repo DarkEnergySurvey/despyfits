@@ -6,7 +6,7 @@ bin_files = glob.glob("bin/*.py") + glob.glob("bin/*.txt")
 
 # The main call
 setup(name='despyfits',
-      version ='0.1.2',
+      version ='0.1.3',
       license = "GPL",
       description = "A set of handy Python fitsfile-related utility functions for DESDM",
       author = "Felipe Menanteau",
