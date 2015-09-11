@@ -176,6 +176,16 @@ def get_hdr_value(hdulist, key, whichhdu=None):
     return val
 
 #######################################################################
+def get_hdr_extra(hdulist, key, whichhdu=None):
+    ukey = key.upper()
+
+    hdr = get_hdr(hdulist, whichhdu)
+    htype = type(hdr[ukey])
+    hcomment = hdr.comments[ukey]
+
+    return hcomment, htype
+
+#######################################################################
 def get_ldac_imhead_as_cardlist(imhead):
     data = imhead.data
     cards = []
