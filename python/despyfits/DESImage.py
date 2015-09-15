@@ -33,8 +33,17 @@ weight_dtype = np.dtype(np.float32)
 variance_dtype = np.dtype(np.float32)
 data_dtype = np.dtype(np.float32)
 pass_fortran = False
-use_indirect_write = False
-indirect_write_prefix = '/tmp/desimage-'
+# Indirect-write behaviour based on the enviroment variables
+# 1. For use_indirect_write
+if os.environ.get('DESPYFITS_USE_INDIRECT_WRITE'):
+    use_indirect_write = True
+else:
+    use_indirect_write = False
+# 2. For indirect_write_prefix
+if os.environ.get('DESPYFITS_INDIRECT_WRITE_PREFIX'):
+    indirect_write_prefix = os.environ.get('DESPYFITS_INDIRECT_WRITE_PREFIX')
+else:
+    indirect_write_prefix = '/tmp/desimage-'
 
 mask_is_unsigned = False
 if mask_is_unsigned:
