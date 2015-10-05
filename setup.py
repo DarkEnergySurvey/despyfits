@@ -22,15 +22,20 @@ libmaskbits = SharedLibrary(
     include_dirs = ['include', '%s/include' % os.environ['IMSUPPORT_DIR']],
     extra_compile_args = ['-O3','-g','-Wall','-shared','-fPIC'])
 
+libcompressionhdu = SharedLibrary(
+    'compressionhdu', 
+    sources = ['src/libcompressionhdu.c'],
+    include_dirs = ['include', '%s/include' % os.environ['IMSUPPORT_DIR']],
+    extra_compile_args = ['-O3','-g','-Wall','-shared','-fPIC'])
 
 # The main call
 setup(name='despyfits',
-      version ='0.2.7',
+      version ='0.2.8',
       license = "GPL",
       description = "A set of handy Python fitsfile-related utility functions for DESDM",
       author = "Felipe Menanteau, Eric Neilsen",
       author_email = "felipe@illinois.edu",
-      shlibs = [libdesimage, libmaskbits],
+      shlibs = [libdesimage, libmaskbits,libcompressionhdu],
       packages = ['despyfits'],
       package_dir = {'': 'python'},
       scripts = bin_files,
