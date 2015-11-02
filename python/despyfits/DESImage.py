@@ -59,6 +59,7 @@ logger = logging.getLogger('DESImage')
 if len(logger.handlers) < 0:
     logger.addHandler(logging.StreamHandler())
 
+
 # exception classes
 
 class MissingData(Exception):
@@ -521,48 +522,25 @@ class DESImage(DESDataImage):
             max_hdu = max(hdu_list)
 
             for hdu in range(max_init_hdu, max_hdu+1):
-                if has_mask and hdu==mask_hdu:
-                    fits.create_image_hdu(self.mask)
-                    if save_mask:
-                        # If we can, write the HDU as we create it
-                        # because insertion into the middle of a
-                        # FITS file is slow.
-                        logger.info("Creating MSK HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % mask_hdu)
-                        fits[mask_hdu].write_keys(self.mask_hdr)
-                        fits[mask_hdu].write_key('DES_EXT','MASK')
-                        fits[mask_hdu].write_key('EXTNAME','MSK')
-                        fits[mask_hdu].write_key('FZALGOR' ,chdu.get_FZALGOR('MSK'))
-                        fits[mask_hdu].write_key('FZQMETHD',chdu.get_FZQMETHD('MSK'))
-                        fits[mask_hdu].write_key('FZDTHRSD',chdu.get_FZDTHRSD('MSK'))
-                        fits[mask_hdu].write_key('FZQVALUE',chdu.get_FZQVALUE('MSK'))
-                        fits[mask_hdu].write(self.mask)
-                        save_mask = False
-                elif has_weight and hdu==weight_hdu:
-                    fits.create_image_hdu(self.weight)
-                    if save_weight:
-                        logger.info("Creating WGT HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % weight_hdu)
-                        fits[weight_hdu].write_keys(self.weight_hdr)
-                        fits[weight_hdu].write_key('DES_EXT','WEIGHT')
-                        fits[weight_hdu].write_key('EXTNAME','WGT')
-                        fits[weight_hdu].write_key('FZALGOR' ,chdu.get_FZALGOR('WGT'))
-                        fits[weight_hdu].write_key('FZQMETHD',chdu.get_FZQMETHD('WGT'))
-                        fits[weight_hdu].write_key('FZDTHRSD',chdu.get_FZDTHRSD('WGT'))
-                        fits[weight_hdu].write_key('FZQVALUE',chdu.get_FZQVALUE('WGT'))
-                        fits[weight_hdu].write(self.weight)
-                        save_weight = False
-                elif hdu==data_hdu:
-                    fits.create_image_hdu(self.data)
-                    if save_data:
-                        logger.info("Creating SCI HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % data_hdu)
-                        fits[data_hdu].write_keys(self.header)
-                        fits[data_hdu].write_key('DES_EXT','IMAGE')
-                        fits[data_hdu].write_key('EXTNAME','SCI')
-                        fits[data_hdu].write_key('FZALGOR' ,chdu.get_FZALGOR('SCI'))
-                        fits[data_hdu].write_key('FZQMETHD',chdu.get_FZQMETHD('SCI'))
-                        fits[data_hdu].write_key('FZDTHRSD',chdu.get_FZDTHRSD('SCI'))
-                        fits[data_hdu].write_key('FZQVALUE',chdu.get_FZQVALUE('SCI'))
-                        fits[data_hdu].write(self.data)
-                        save_data = False
+
+                if hdu==data_hdu and save_data:
+                    logger.info("Creating SCI HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % data_hdu)
+                    # Update the hdr with the proper FZ keywords
+                    self.header = update_hdr_compression(self.header,'SCI')
+                    fits.write(self.data,extname='SCI',header=self.header)
+                    save_data = False
+                elif has_mask and hdu==mask_hdu and save_mask:
+                    logger.info("Creating MSK HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % mask_hdu)
+                    # Update the hdr with the proper FZ keywords
+                    self.mask_hdr = update_hdr_compression(self.mask_hdr,'MSK')
+                    fits.write(self.mask,extname='MSK',header=self.mask_hdr)
+                    save_mask = False
+                elif has_weight and hdu==weight_hdu and save_weight:
+                    logger.info("Creating WGT HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % weight_hdu)
+                    # Update the hdr with the proper FZ keywords
+                    self.weight_hdr = update_hdr_compression(self.weight_hdr,'WGT')
+                    fits.write(self.weight,extname='WGT',header=self.weight_hdr)
+                    save_weight = False
                 else:
                     fits.create_image_hdu(np.zeros((1,1)), extname='DUMMY')
 
@@ -591,7 +569,6 @@ class DESImage(DESDataImage):
                 hdr = fits[weight_hdu].read_header()
                 if hdr['DES_EXT'].rstrip() != 'WEIGHT':
                     raise UnexpectedDesExt('weight not in expected HDU')
-
 
                 if 'DES_EXT' in self.weight_hdr:
                     if self.weight_hdr['DES_EXT'].rstrip() != 'WEIGHT':
@@ -844,6 +821,7 @@ def section2slice(section, reorder=False):
     return (slice(values[2]-1,values[3]),
             slice(values[0]-1,values[1]))
 
+
 def slice2section(s):
     """
     Convert numpy 2d slice specification into an IRAF/FITS section specification string.
@@ -1036,3 +1014,22 @@ def localize_numpy_array(data, new_dtype=None):
         # Older version of numpy
         local_data = data.astype(native_dtype)
     return local_data
+
+
+def update_hdr_compression(hdr,extname):
+
+    # Translator for DES_EXT -- FM says: This sets of definitions should be centralized.
+    DES_EXT = {
+        'SCI' : 'IMAGE',
+        'WGT' : 'WEIGHT',
+        'MSK' : 'MASK',
+        }
+    hdr['EXTNAME']  = extname
+    hdr['DES_EXT']  = DES_EXT[extname]
+    hdr['FZALGOR']  = chdu.get_FZALGOR(extname)
+    hdr['FZDTHRSD'] = chdu.get_FZDTHRSD(extname)
+    hdr['FZQVALUE'] = chdu.get_FZQVALUE(extname)
+    # We only update FZQMETHD if not NONE
+    if chdu.get_FZQMETHD(extname) != "NONE":
+        hdr['FZQMETHD'] = chdu.get_FZQMETHD(extname)
+    return hdr
