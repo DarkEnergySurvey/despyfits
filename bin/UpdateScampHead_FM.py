@@ -99,7 +99,7 @@ def get_fwhm_from_catalog(args):
     tmpdict = {}
     if args.fwhm:
         if args.verbose: print "(UpdateScampHead): Will determine median FWHM & ELLIPTICITY and number of candidates"
-        fwhm_med,ellp_med,count =fwhmFromFITS_LDAC_fitsio(args.fwhm,debug=args.debug)
+        fwhm_med,ellp_med,count =fwhmFromFITS_LDAC(args.fwhm,debug=args.debug)
     else:
         if args.verbose: print "FWHM option keyword will not be populated\n"
         return tmpdict
