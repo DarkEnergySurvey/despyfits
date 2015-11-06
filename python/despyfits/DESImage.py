@@ -1024,12 +1024,20 @@ def update_hdr_compression(hdr,extname):
         'WGT' : 'WEIGHT',
         'MSK' : 'MASK',
         }
-    hdr['EXTNAME']  = extname
-    hdr['DES_EXT']  = DES_EXT[extname]
-    hdr['FZALGOR']  = chdu.get_FZALGOR(extname)
-    hdr['FZDTHRSD'] = chdu.get_FZDTHRSD(extname)
-    hdr['FZQVALUE'] = chdu.get_FZQVALUE(extname)
+
+    # Create FITSHDR records with comments to insert into the header
+    records = [
+        {'name': 'EXTNAME', 'value':extname,         'comment':'Name of the extension'},
+        {'name': 'DES_EXT', 'value':DES_EXT[extname],'comment':'DES name of the extension'},
+        {'name': 'FZALGOR', 'value':chdu.get_FZALGOR(extname), 'comment':'Compression type'},
+        {'name': 'FZDTHRSD','value':chdu.get_FZDTHRSD(extname),'comment':'Dithering seed value'},
+        {'name': 'FZQVALUE','value':chdu.get_FZQVALUE(extname),'comment':'Compression quantization factor'},
+        ]
     # We only update FZQMETHD if not NONE
     if chdu.get_FZQMETHD(extname) != "NONE":
-        hdr['FZQMETHD'] = chdu.get_FZQMETHD(extname)
+        rec = {'name': 'FZQMETHD','value':chdu.get_FZQMETHD(extname),'comment':'Compression quantization method'}
+        records.append(rec)
+
+    # Now we add them to the header
+    [hdr.add_record(rec) for rec in records]
     return hdr

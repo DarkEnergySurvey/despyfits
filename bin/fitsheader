@@ -13,35 +13,24 @@ import argparse
 import os,sys
 import fitsio
 
-def print_header(fitsfile,ext=0,ofileh=sys.stdout):
+def print_header(filename,ext=0):
+    
     """ print header from fits file to either stdout or to a file """
-
-    hdr = fitsio.read_header(fitsfile, ext=ext)
-    ofileh.write("%s" % hdr)
-    ofileh.write("\n")
-    outfh.close()
+    hdr = fitsio.read_header(filename, ext=ext)
+    print (hdr)
     return
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Prints fits headers')
-    parser.add_argument('-o', '--outfile', action='store', type=str,help="Print header to given file", default=False)
-    parser.add_argument('-x','--extension', action='store', default=0)
-    parser.add_argument('fitsfile', action='store')
-    args = parser.parse_args()
-    
-    if args.outfile:
-        try:
-            outfh = open(args.outfile, "w")
-        except:
-            sys.exit("ERROR: Cannot open %s" % args.outfile)
-    else:
-        outfh=sys.stdout
 
-    # Convert extension to integers in not strings
+    parser.add_argument('filename', action='store')
+    parser.add_argument('-x','--extension', action='store', default=0)
+    #parser.add_argument('-o', '--output', action='store', type=str,help="Print header to given file", default=False)
+    args = parser.parse_args()
+
     try:
         args.extension = int(args.extension)
     except:
         pass
-
-    # Make the call
-    print_header(args.fitsfile, ext=args.extension, ofileh=outfh)
+    
+    print_header(args.filename, ext=args.extension)
