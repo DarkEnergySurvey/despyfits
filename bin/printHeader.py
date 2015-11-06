@@ -10,33 +10,22 @@ Print header values to either stdout or to a file
 """
 
 import argparse
-import os
-import sys
-import pyfits
-from pyfits import getheader
+import os,sys
+import fitsio
 
-def print_header(fitsfile,ofileh=sys.stdout):
+def print_header(fitsfile,ext=0,ofileh=sys.stdout):
     """ print header from fits file to either stdout or to a file """
 
-    # Get the Pyfits version as a float
-    pyfitsVersion = float(".".join(pyfits.__version__.split(".")[0:2]))
-
-    hdr = getheader(fitsfile)
-    if pyfitsVersion < 3.1:  # Older method
-        ofileh.write("%s" % hdr.ascardlist())
-    else: # use the up-to-date method (Header.cards)
-        for items in hdr.cards:
-            ofileh.write("%s\n" % items)
-
+    hdr = fitsio.read_header(fitsfile, ext=ext)
+    ofileh.write("%s" % hdr)
     ofileh.write("\n")
     outfh.close()
     return
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Prints fits headers')
-    parser.add_argument('-O', '--outfile', action='store', type=str,help="Print header to given file", default=False)
-    #parser.add_argument('-c', action='store', type=str, help="Text file containing which header values to print")
+    parser.add_argument('-o', '--outfile', action='store', type=str,help="Print header to given file", default=False)
+    parser.add_argument('-x','--extension', action='store', default=0)
     parser.add_argument('fitsfile', action='store')
     args = parser.parse_args()
     
@@ -48,5 +37,11 @@ if __name__ == "__main__":
     else:
         outfh=sys.stdout
 
+    # Convert extension to integers in not strings
+    try:
+        args.extension = int(args.extension)
+    except:
+        pass
+
     # Make the call
-    print_header(args.fitsfile, outfh)
+    print_header(args.fitsfile, ext=args.extension, ofileh=outfh)
