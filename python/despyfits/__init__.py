@@ -7,5 +7,3 @@ version = __version__
  Python-based modules
 """
 
-from . import fitsutils
-from .fitsutils import *
