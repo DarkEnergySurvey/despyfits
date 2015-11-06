@@ -76,7 +76,7 @@ def get_keywords_to_update(args):
     """
     if not os.path.isfile(args.hdupcfg):
         exit ('Header update config file (%s) not found! ',args.hdupcfg)
-    if args.verbose: print "(UpdateScampHead): Reading the KEYWORD that we need want to UPDATE."
+    if args.verbose: print "(updateWCS): Reading the KEYWORD that we need want to UPDATE."
 
     kywds_spec = {}
     for line in open(args.hdupcfg).readlines():
@@ -98,7 +98,7 @@ def get_fwhm_from_catalog(args):
 
     tmpdict = {}
     if args.fwhm:
-        if args.verbose: print "(UpdateScampHead): Will determine median FWHM & ELLIPTICITY and number of candidates"
+        if args.verbose: print "(updateWCS): Will determine median FWHM & ELLIPTICITY and number of candidates"
         fwhm_med,ellp_med,count =fwhmFromFITS_LDAC(args.fwhm,debug=args.debug)
     else:
         if args.verbose: print "FWHM option keyword will not be populated\n"
@@ -182,7 +182,7 @@ def fix_PVs(header,args):
     keys = ['PV1_3','PV2_3']
     for name in keys:
         if name not in header:
-            if args.verbose: print "(UpdateScampHead) Updating %s" % name
+            if args.verbose: print "(updateWCS) Updating %s" % name
             rec = {'name': name, 'value':0.0, 'comment':'Projection distortion parameter'}
             header.add_record(rec)
     return header
@@ -245,6 +245,6 @@ if __name__ == "__main__":
     input_image = update_headers(input_image, scamp_header, keywords_spec)
 
     # Saving the image as args.output
-    print "(UpdateScampHead): Closing/Saving image --> %s" % args.output
+    print "(updateWCS): Closing/Saving image --> %s" % args.output
     input_image.save(args.output)
     
