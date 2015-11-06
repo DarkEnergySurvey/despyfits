@@ -1,5 +1,6 @@
 setupRequired(pyfits 3.3+3)
 setupRequired(fitsio 0.9.8rc1+2)
+#setupRequired(despyastro)
 
 # New dependencies
 setupRequired(shlib 2.1.11+2)

@@ -229,7 +229,7 @@ if __name__ == "__main__":
     scamp_header = fitsio.read_scamp_head(args.headfile)
     scamp_header = fix_PVs(scamp_header,args)
 
-    # Merge scamp_header and new_record. Because scamp_header is FITSHDR object we append to it
+    # Merge scamp_header and new_record. Because scamp_header is a FITSHDR object we can append to it
     [scamp_header.add_record(rec) for rec in new_record]
     
     # Read in the input fits file using despyfits.DESImage
