@@ -9,6 +9,8 @@ import os
 import sys
 import pyfits
 
+import despymisc.miscutils as miscutils
+
 """ Miscellaneous generic support functions for fits files """
 
 class makeMEF(object):
@@ -104,6 +106,95 @@ class makeMEF(object):
         return
 
 
+#######################################################################
+def combine_cats(incats, outcat):
+    """
+    Combine all input catalogs (each with 3 hdus) into a single fits file
+    """
+
+    # if incats is comma-separated list, split into python list 
+    comma_re = re.compile("\s*,\s*")
+    incat_lst = comma_re.split(incats)
+
+    if miscutils.fwdebug_check(3, 'FITSUTILS_DEBUG'):
+        miscutils.fwdebug_print("Constructing hdulist object for single fits file")
+    # Construct hdulist object to append hdus from individual catalogs to
+    hdulist = pyfits.HDUList()
+
+    # Now append the hdus from each input catalog file to the hdulist
+    for incat in incat_lst:
+        if miscutils.fwdebug_check(3, 'FITSUTILS_DEBUG'):
+            miscutils.fwdebug_print("Appending 3 HDUs from cat --> %s" % incat)
+        hdulist1 = pyfits.open(incat, mode='readonly')
+        hdulist.append(hdulist1[0])
+        hdulist.append(hdulist1[1])
+        hdulist.append(hdulist1[2])
+        #hdulist1.close()
+
+    # And write the full hdulist to the output file
+    if os.path.exists(outcat):
+        os.remove(outcat)
+        miscutils.fwdebug_print("Removing pre-existing version of fullcat %s" % outcat)
+
+    if miscutils.fwdebug_check(3, 'FITSUTILS_DEBUG'):
+        miscutils.fwdebug_print("Writing results to fullcat --> %s" % outcat)
+    hdulist.writeto(outcat)
+
+    if miscutils.fwdebug_check(6, 'FITSUTILS_DEBUG'):
+        miscutils.fwdebug_print("Using fits_close to close fullcat --> %s" % outcat)
+    hdulist.close()
+
+
+def splitScampHead(head_out, heads):
+    """
+    Split single SCAMP output head file into individual files
+      head_out:  SCAMP output
+      head_lst:  list of filenames to use for individual files
+      reqheadcount: expected number of individual head files
+    """
+
+    comma_re = re.compile("\s*,\s*")
+    head_lst = comma_re.split(heads)
+    reqheadcount = len(head_lst)
+    headcount = 0
+    endcount = 0
+    linecount = 0
+    linecount_tot = 0
+    filehead = None
+    for line in open(head_out,'r'):
+        if re.match("^HISTORY   Astrometric solution by SCAMP.*",line):
+            if filehead != None:
+                filehead.close()
+                if miscutils.fwdebug_check(3, 'FITSUTILS_DEBUG'):
+                    miscutils.fwdebug_print("Closing .head file after writing %d lines." % linecount)
+                if endcount != headcount:
+                    miscutils.fwdebug_print("Error: problem when writing %s" % head_lst[headcount])
+                    raise ValueError("Number of END lines (%d) does not match number of HISTORY lines (%d)" % (endcount, headcount))
+            if miscutils.fwdebug_check(3, 'FITSUTILS_DEBUG'):
+                miscutils.fwdebug_print("Opening .head file %d --> %s" % (headcount, head_lst[headcount]))
+            filehead = open(head_lst[headcount],'w')
+            headcount += 1
+            linecount = 0
+        elif re.match("^END\s*",line):
+            endcount += 1
+        filehead.write(line)
+        linecount += 1
+        linecount_tot += 1
+    filehead.close()
+
+    if endcount != headcount:
+        miscutils.fwdebug_print("Error: problem when writing %s" % head_lst[headcount])
+        raise ValueError("Number of END lines (%d) does not match number of HISTORY lines (%d)" % \
+                         (endcount, headcount))
+
+    if miscutils.fwdebug_check(3, 'FITSUTILS_DEBUG'):
+        miscutils.fwdebug_print("Closing .head file after writing %d lines.\n" % linecount)
+
+    if headcount != reqheadcount:
+        raise ValueError("Number of head files made (%d) does not match required number of head files (%d)" % (headcount, reqheadcount))
+
+
+
 
 #######################################################################
 def get_hdr(hdulist, whichhdu):
@@ -137,6 +228,16 @@ def get_hdr_value(hdulist, key, whichhdu=None):
     val = hdr[ukey]
 
     return val
+
+#######################################################################
+def get_hdr_extra(hdulist, key, whichhdu=None):
+    ukey = key.upper()
+
+    hdr = get_hdr(hdulist, whichhdu)
+    htype = type(hdr[ukey])
+    hcomment = hdr.comments[ukey]
+
+    return hcomment, htype
 
 #######################################################################
 def get_ldac_imhead_as_cardlist(imhead):
