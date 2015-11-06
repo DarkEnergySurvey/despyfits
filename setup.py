@@ -6,7 +6,7 @@ import glob
 import shlib 
 from shlib.build_shlib import SharedLibrary
 
-bin_files = glob.glob("bin/*.py") + glob.glob("bin/*.txt")
+bin_files = glob.glob("bin/*") + glob.glob("bin/*.txt")
 inc_files = glob.glob("include/*.h") 
 doc_files = glob.glob("doc/*.*")
 etc_files = glob.glob("etc/*.*")
