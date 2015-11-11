@@ -24,6 +24,7 @@ from fitsio import FITSHDR
 from despyfits import maskbits
 from despyfits import compressionhdu as chdu
 from despyfits.DESFITSInventory import DESFITSInventory
+from despyastro.CCD_corners import update_DESDM_corners
 
 # constants
 
@@ -524,15 +525,21 @@ class DESImage(DESDataImage):
             for hdu in range(max_init_hdu, max_hdu+1):
 
                 if hdu==data_hdu and save_data:
-                    logger.info("Creating SCI HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % data_hdu)
                     # Update the hdr with the proper FZ keywords
+                    logger.info("Creating SCI HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % data_hdu)
                     self.header = update_hdr_compression(self.header,'SCI')
+                    # Calculate coordinates for ccd center and corners and update the header
+                    logger.info("Calculating CCD corners/center/extern keywords for SCI HDU %d " % data_hdu)
+                    self.header = update_DESDM_corners(self.header,get_extent=True, verb=False)
                     fits.write(self.data,extname='SCI',header=self.header)
                     save_data = False
                 elif has_mask and hdu==mask_hdu and save_mask:
-                    logger.info("Creating MSK HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % mask_hdu)
                     # Update the hdr with the proper FZ keywords
+                    logger.info("Creating MSK HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % mask_hdu)
                     self.mask_hdr = update_hdr_compression(self.mask_hdr,'MSK')
+                    # Calculate coordinates for ccd center and corners and update the header
+                    logger.info("Calculating CCD corners/center/extern keywords for MSK HDU %d " % mask_hdu)
+                    self.mask_hdr = update_DESDM_corners(self.mask_hdr,get_extent=True, verb=False)
                     fits.write(self.mask,extname='MSK',header=self.mask_hdr)
                     save_mask = False
                 elif has_weight and hdu==weight_hdu and save_weight:

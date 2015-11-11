@@ -13,7 +13,6 @@ import fitsio
 
 # DESDM libraries
 from despyfits.fwhmFromFITS_LDAC import fwhmFromFITS_LDAC
-from despyastro.CCD_corners import update_DESDM_corners
 from despymisc.xmlslurp import Xmlslurper
 from despyfits.DESImage import DESImage
 
@@ -235,16 +234,10 @@ if __name__ == "__main__":
     # Read in the input fits file using despyfits.DESImage
     input_image = DESImage.load(args.input)
     
-    # Calculate coordinates for ccd center and corners.
-    # Get (NAXIS1, NAXIS2) from the parent image SCI header and update the scamp_header dictionary
-    scamp_header['NAXIS1'] = input_image.header['NAXIS1']
-    scamp_header['NAXIS2'] = input_image.header['NAXIS2']
-    scamp_header = update_DESDM_corners(scamp_header,get_extent=True, verb=args.verbose)
-
     # Update the headers on the input image, with all the new information
     input_image = update_headers(input_image, scamp_header, keywords_spec)
 
-    # Saving the image as args.output
+    # Saving the image as args.output, we compute the corners at write time
     print "(updateWCS): Closing/Saving image --> %s" % args.output
     input_image.save(args.output)
     

@@ -1,8 +1,7 @@
 setupRequired(pyfits 3.3+3)
-setupRequired(fitsio 0.9.8rc1+2)
-#setupRequired(despyastro)
+setupRequired(fitsio 0.9.8rc1+3)
+setupRequired(despyastro 0.3.4+0)
 
-# New dependencies
 setupRequired(shlib 2.1.11+2)
 setupRequired(imsupport 7.3.2+0)
 
