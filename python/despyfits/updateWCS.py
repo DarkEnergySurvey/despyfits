@@ -214,12 +214,17 @@ def cmdline():
 
 def run_updateWCS(args):
 
-
     # Attempt to populate FWHM, ELLIPTIC, NFWHMCNT keywords 
-    new_record = get_fwhm_from_catalog(args)
+    if args.fwhm:
+        new_record = get_fwhm_from_catalog(args)
+    else:
+        new_record = {}
 
     # Populate the new record with the XML and transalte into fitsio records format
-    new_record = slurp_XML(args,new_record,translate=True)
+    if args.xml:
+        new_record = slurp_XML(args,new_record,translate=True)
+    else:
+        new_record = []
 
     # Read in the header update configuration file
     keywords_spec = get_keywords_to_update(args)
