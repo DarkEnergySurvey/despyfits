@@ -24,7 +24,7 @@ def get_record(header,keyword):
     index = header._index_map[keyword]
     return header._record_list[index]
 
-def update_headers(image, new_header, keywords_spec, verb=False):
+def update_headers(image, new_header, keywords_spec, verbose=False):
 
     """
     Update the header in image using the FITSHRD object new_record for keywords present in keywords_spec
@@ -37,12 +37,12 @@ def update_headers(image, new_header, keywords_spec, verb=False):
     for keyword in keywords_spec:
 
         new_record = get_record(new_header,keyword)
-        if verb:
+        if verbose:
             try:
                 old_value = image.header[keyword]
             except:
                 old_value = "Undefined"
-            print "Updating keyword: %-8s from %s --> %s for %s" % (keyword,old_value, new_record['value'], keywords_spec[keyword])
+            print "(updateWCS) Updating keyword: %-8s from %s --> %s for %s" % (keyword,old_value, new_record['value'], keywords_spec[keyword])
 
         # Loop over HDU's
         for hdu in keywords_spec[keyword]:
@@ -68,19 +68,19 @@ def pyfitsrec2fitsiorecord(old_record):
         new_record.append(rec)
     return new_record
 
-def get_keywords_to_update(args):
+def get_keywords_to_update(hdupcfg,verbose=False):
 
     """
     Read in the header update configuration file.
     Now all keywords that can be found/derived should be present are
     read from a configuration file
     """
-    if not os.path.isfile(args.hdupcfg):
-        exit ('Header update config file (%s) not found! ',args.hdupcfg)
-    if args.verbose: print "(updateWCS): Reading the KEYWORD that we need want to UPDATE."
+    if not os.path.isfile(hdupcfg):
+        exit ('Header update config file (%s) not found! ',hdupcfg)
+    if verbose: print "(updateWCS): Reading the KEYWORD that we need want to UPDATE."
 
     kywds_spec = {}
-    for line in open(args.hdupcfg).readlines():
+    for line in open(hdupcfg).readlines():
         if line[0] == "#":
             continue
         keyword = line.split()[0]
@@ -93,19 +93,19 @@ def get_keywords_to_update(args):
             
     return kywds_spec 
 
-def get_fwhm_from_catalog(args):
+def get_fwhm_from_catalog(fwhm,verbose=False,debug=False):
 
     """ Gets the FWHM and ELLIPTICITY """
 
     tmpdict = {}
-    if args.fwhm:
-        if args.verbose: print "(updateWCS): Will determine median FWHM & ELLIPTICITY and number of candidates"
-        fwhm_med,ellp_med,count =fwhmFromFITS_LDAC(args.fwhm,debug=args.debug)
+    if fwhm:
+        if verbose: print "(updateWCS): Will determine median FWHM & ELLIPTICITY and number of candidates"
+        fwhm_med,ellp_med,count =fwhmFromFITS_LDAC(fwhm,debug=debug)
     else:
-        if args.verbose: print "FWHM option keyword will not be populated\n"
+        if verbose: print "FWHM option keyword will not be populated\n"
         return tmpdict
     
-    if args.verbose and not args.debug:
+    if verbose and not debug:
         print " FWHM    =%.4f" % fwhm_med   
         print " ELLIPTIC=%.4f" % ellp_med   
         print " NFWHMCNT=%s" % count
@@ -114,22 +114,22 @@ def get_fwhm_from_catalog(args):
     tmpdict['NFWHMCNT'] = [count,'Number of objects used to find FWHM']
     return tmpdict
 
-def slurp_XML(args,tmpdict, translate=True):
+def slurp_XML(xml,tmpdict, verbose=False, debug=False, translate=True):
 
     """ Read in the XML File """
 
     key_pairs={}
-    if args.xml:
-        if args.verbose: print "Reading SCAMP XML file: {:s}".format(args.xml)
+    if xml:
+        if verbose: print "Reading SCAMP XML file: {:s}".format(xml)
         try:
-            tmp_xml_tbl=Xmlslurper(args.xml,['FGroups']).gettables()
+            tmp_xml_tbl=Xmlslurper(xml,['FGroups']).gettables()
             # Possible that should redefine the keys using the same unicodedata.normalize method as for the values below
         except:
             print "Error: failed to slurp the data."
             pass 
 
         if ('FGroups' in tmp_xml_tbl):
-            if args.debug: 
+            if debug: 
                 for key in tmp_xml_tbl['FGroups']:
                     print "  %s = %s" % (key,tmp_xml_tbl['FGroups'][key])
                     
@@ -179,11 +179,11 @@ def slurp_XML(args,tmpdict, translate=True):
 
     return new_record
 
-def fix_PVs(header,args):
+def fix_PVs(header,verbose=False):
     keys = ['PV1_3','PV2_3']
     for name in keys:
         if name not in header:
-            if args.verbose: print "(updateWCS) Updating %s" % name
+            if verbose: print "(updateWCS) Updating %s" % name
             rec = {'name': name, 'value':0.0, 'comment':'Projection distortion parameter'}
             header.add_record(rec)
     return header
@@ -212,35 +212,49 @@ def cmdline():
         print "Args: ",args
     return args
 
+
+def run_update(input_image,headfile,hdupcfg,verbose=False,new_record=[]):
+
+    """
+    Function to perform only header update once all information has been read/load.
+    It is performed on an 'input_image' which is DESimage object
+    """
+
+    # Read in the header update configuration file
+    keywords_spec = get_keywords_to_update(hdupcfg,verbose=verbose)
+
+    # Read in the SCAMP .head using fitsio
+    scamp_header = fitsio.read_scamp_head(headfile)
+    scamp_header = fix_PVs(scamp_header,verbose=verbose)
+
+    # Merge scamp_header and new_record. Because scamp_header is a FITSHDR object we can append to it
+    [scamp_header.add_record(rec) for rec in new_record]
+    
+    # Update the headers on the input image, with all the new information
+    input_image = update_headers(input_image, scamp_header, keywords_spec,verbose=verbose)
+
+    return input_image
+
+
 def run_updateWCS(args):
 
     # Attempt to populate FWHM, ELLIPTIC, NFWHMCNT keywords 
     if args.fwhm:
-        new_record = get_fwhm_from_catalog(args)
+        new_record = get_fwhm_from_catalog(args.fwhm,verbose=args.verbose,debug=args.debug)
     else:
         new_record = {}
 
     # Populate the new record with the XML and transalte into fitsio records format
     if args.xml:
-        new_record = slurp_XML(args,new_record,translate=True)
+        new_record = slurp_XML(args.xml,new_record, verbose=args.verbose, debug=args.debug, translate=True)
     else:
         new_record = []
 
-    # Read in the header update configuration file
-    keywords_spec = get_keywords_to_update(args)
-
-    # Read in the SCAMP .head using fitsio
-    scamp_header = fitsio.read_scamp_head(args.headfile)
-    scamp_header = fix_PVs(scamp_header,args)
-
-    # Merge scamp_header and new_record. Because scamp_header is a FITSHDR object we can append to it
-    [scamp_header.add_record(rec) for rec in new_record]
-    
     # Read in the input fits file using despyfits.DESImage
     input_image = DESImage.load(args.input)
-    
-    # Update the headers on the input image, with all the new information
-    input_image = update_headers(input_image, scamp_header, keywords_spec)
+
+    # run the main header updater
+    input_image = run_update(input_image,headfile=args.headfile,hdupcfg=args.hdupcfg,verbose=args.verbose,new_record=new_record)
 
     # Saving the image as args.output, we compute the corners at write time
     print "(updateWCS): Closing/Saving image --> %s" % args.output
