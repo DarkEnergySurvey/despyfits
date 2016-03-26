@@ -2,13 +2,8 @@
 
 from despyfits import updateWCS 
 import time
-import logging
 from despymisc.miscutils import elapsed_time
 
-# Get the start time
-t0 = time.time()
 # Get all of the args
 args = updateWCS.cmdline()
 updateWCS.run_updateWCS(args)
-logger = logging.getLogger('Merge')
-logger.info("UpdateWCS Time: %s" % elapsed_time(t0))
