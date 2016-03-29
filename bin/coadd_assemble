@@ -1,0 +1,14 @@
+#!/usr/bin/env python
+
+import time
+import logging
+from multiepoch import coadd_MEF
+from despymisc.miscutils import elapsed_time
+
+# Get the start time
+t0 = time.time()
+args = coadd_MEF.cmdline()
+kwargs = vars(args)
+coadd_MEF.merge(**kwargs)
+logger = logging.getLogger('Merge')
+logger.info("Coadd Merge MEF Time: %s" % elapsed_time(t0))
