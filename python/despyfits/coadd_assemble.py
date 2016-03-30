@@ -143,11 +143,13 @@ def merge(**kwargs):
             WGT     = zipp.zipper_interp(WGT,MSK,interp_mask,axis=2, ydilate=10,**kwargs)
 
     # Update compression settings
+    logger.info("Updating compression settings")
     sci_hdr = DESImage.update_hdr_compression(sci_hdr,'SCI')
     msk_hdr = DESImage.update_hdr_compression(msk_hdr,'MSK')
     wgt_hdr = DESImage.update_hdr_compression(wgt_hdr,'WGT')
 
     # Add corners, centers and extend
+    logger.info("Updating Image Corners")
     sci_hdr = CCD_corners.update_DESDM_corners(sci_hdr,get_extent=True, verb=False)
     msk_hdr = CCD_corners.update_DESDM_corners(msk_hdr,get_extent=True, verb=False)
 
