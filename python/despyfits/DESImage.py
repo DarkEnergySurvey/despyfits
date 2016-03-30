@@ -46,6 +46,11 @@ if os.environ.get('DESPYFITS_INDIRECT_WRITE_PREFIX'):
     indirect_write_prefix = os.environ.get('DESPYFITS_INDIRECT_WRITE_PREFIX')
 else:
     indirect_write_prefix = '/tmp/desimage-'
+# 3. For adding DESDM_PIPEPROD/DESDM_PIPERVER keys
+if os.environ.get('DESPYFITS_PIPEKEYS_WRITE'):
+    pipekeys_write = True
+else:
+    pipekeys_write = False
 
 mask_is_unsigned = False
 if mask_is_unsigned:
@@ -531,6 +536,9 @@ class DESImage(DESDataImage):
                     # Calculate coordinates for ccd center and corners and update the header
                     logger.info("Calculating CCD corners/center/extern keywords for SCI HDU %d " % data_hdu)
                     self.header = update_DESDM_corners(self.header,get_extent=True, verb=False)
+                    if pipekeys_write:
+                        logger.info("Inserting EUPS PIPEPROD and PIPEVER to SCI HDU")
+                        self.header = insert_eupspipe(self.header)
                     fits.write(self.data,extname='SCI',header=self.header)
                     save_data = False
                 elif has_mask and hdu==mask_hdu and save_mask:
@@ -1048,3 +1056,23 @@ def update_hdr_compression(hdr,extname):
     # Now we add them to the header
     [hdr.add_record(rec) for rec in records]
     return hdr
+
+
+def insert_eupspipe(hdr):
+    import os
+
+    try:
+        EUPSPROD = os.environ['DESDM_PIPEPROD']
+        EUPSVER  = os.environ['DESDM_PIPEVER']
+    except:
+        logger.info("WARNING: Could not find DESDM_PIPEPROD and DESDM_PIPEPVER in the environment")
+        return hdr
+
+    records = [
+        {'name': 'EUPSPROD','value':EUPSPROD,'comment':'eups pipeline meta-package name'},
+        {'name': 'EUPSVER', 'value':EUPSVER, 'comment':'eups pipeline meta-package version'},
+        ]
+    # Now we add them to the header
+    [hdr.add_record(rec) for rec in records]
+    return hdr
+
