@@ -143,11 +143,13 @@ def merge(**kwargs):
             WGT     = zipp.zipper_interp(WGT,MSK,interp_mask,axis=2, ydilate=10,**kwargs)
 
     # Update compression settings
+    logger.info("Updating compression settings")
     sci_hdr = DESImage.update_hdr_compression(sci_hdr,'SCI')
     msk_hdr = DESImage.update_hdr_compression(msk_hdr,'MSK')
     wgt_hdr = DESImage.update_hdr_compression(wgt_hdr,'WGT')
 
     # Add corners, centers and extend
+    logger.info("Updating Image Corners")
     sci_hdr = CCD_corners.update_DESDM_corners(sci_hdr,get_extent=True, verb=False)
     msk_hdr = CCD_corners.update_DESDM_corners(msk_hdr,get_extent=True, verb=False)
 
@@ -171,10 +173,15 @@ def merge(**kwargs):
         record={'name':'TILEID', 'value':TILEID, 'comment':'Tile ID for DES Tilename'}
         sci_hdr.add_record(record)
 
+    # Insert EUPS PIPEPROD and PIPEVER to SCI HDU")
+    if DESImage.pipekeys_write:
+        logger.info("Inserting EUPS PIPEPROD and PIPEVER to SCI HDU")
+        sci_hdr = DESImage.insert_eupspipe(sci_hdr)
 
     # Add to image history
     sci_hdr['HISTORY'] = time.asctime(time.localtime()) + \
                          ' column_interp over mask 0x{:04X}'.format(interp_mask)
+
     # Write it out now
     logger.info("Writing %s" % outname)
     ofits = fitsio.FITS(outname,'rw',clobber=True)
