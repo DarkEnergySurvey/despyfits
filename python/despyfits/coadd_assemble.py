@@ -171,10 +171,15 @@ def merge(**kwargs):
         record={'name':'TILEID', 'value':TILEID, 'comment':'Tile ID for DES Tilename'}
         sci_hdr.add_record(record)
 
+    # Insert EUPS PIPEPROD and PIPEVER to SCI HDU")
+    if DESImage.pipekeys_write:
+        logger.info("Inserting EUPS PIPEPROD and PIPEVER to SCI HDU")
+        sci_hdr = DESImage.insert_eupspipe(sci_hdr)
 
     # Add to image history
     sci_hdr['HISTORY'] = time.asctime(time.localtime()) + \
                          ' column_interp over mask 0x{:04X}'.format(interp_mask)
+
     # Write it out now
     logger.info("Writing %s" % outname)
     ofits = fitsio.FITS(outname,'rw',clobber=True)
