@@ -101,6 +101,7 @@ def merge(**kwargs):
     logger      = kwargs.get('logger',None)
     outname     = kwargs.get('outname',False)
     interp_mask = kwargs.get('interp_mask',1)
+    xblock      = kwargs.get('xblock',0)
     #BADPIX_INTERP = kwargs.get('BADPIX_INTERP',maskbits.BADPIX_INTERP)
     BADPIX_INTERP = kwargs.get('BADPIX_INTERP',None)
     # Header options (all optional)
@@ -131,16 +132,19 @@ def merge(**kwargs):
     MSK  = numpy.where(SCI == 0,0,MSK)
 
     # Perform column interpolation -- Axis=2
-    if BADPIX_INTERP:
-        SCI,MSK = zipp.zipper_interp(SCI,MSK,interp_mask,axis=2, **kwargs)
-        # Interpolate the WGT plane if we don't have a msk_file
-        if not msk_file:
-            WGT,MSK = zipp.zipper_interp(WGT,MSK,interp_mask,axis=2, ydilate=10, **kwargs)
+    if xblock > 0:
+        if BADPIX_INTERP:
+            SCI,MSK = zipp.zipper_interp(SCI,MSK,interp_mask,axis=2, **kwargs)
+            # Interpolate the WGT plane if we don't have a msk_file
+            if not msk_file:
+                WGT,MSK = zipp.zipper_interp(WGT,MSK,interp_mask,axis=2, ydilate=10, **kwargs)
+        else:
+            SCI     = zipp.zipper_interp(SCI,MSK,interp_mask,axis=2, **kwargs)
+            # Interpolate the WGT plane if we don't have a msk_file
+            if not msk_file:
+                WGT     = zipp.zipper_interp(WGT,MSK,interp_mask,axis=2, ydilate=10,**kwargs)
     else:
-        SCI     = zipp.zipper_interp(SCI,MSK,interp_mask,axis=2, **kwargs)
-        # Interpolate the WGT plane if we don't have a msk_file
-        if not msk_file:
-            WGT     = zipp.zipper_interp(WGT,MSK,interp_mask,axis=2, ydilate=10,**kwargs)
+        logger.info("Skipping interpolation -- xblock=0")
 
     # Update compression settings
     logger.info("Updating compression settings")

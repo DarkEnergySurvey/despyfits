@@ -4,7 +4,7 @@ setupRequired(despyastro 0.3.5+0)
 setupRequired(despymisc 1.0.1+0)
 
 setupRequired(shlib 2.1.11+2)
-setupRequired(imsupport 7.3.2+0)
+setupRequired(imsupport 7.3.2+1)
 
 envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
 envAppend(PATH, ${PRODUCT_DIR}/bin)
