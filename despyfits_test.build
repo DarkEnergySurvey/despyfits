@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
-echo -n "Enter path to PRODUCT_DIR: "
-read product_dir
-export PRODUCT_DIR=$product_dir
+#echo -n "Enter path to PRODUCT_DIR: "
+#read product_dir
+#export PRODUCT_DIR=$product_dir
+
+export PRODUCT_DIR=$HOME/build-test/despyfits
 echo "Will Install to: $PRODUCT_DIR"
 
 source $EUPS_DIR/desdm_eups_setup.sh
