@@ -15,15 +15,6 @@ from despyastro import astrometry
 from despyastro import zipper_interp as zipp
 from despyastro import CCD_corners 
 
-
-
-# Translator for DES_EXT, being nice.
-DES_EXT = {
-    'SCI' : 'IMAGE',
-    'WGT' : 'WEIGHT',
-    'MSK' : 'MASK',
-    }
-
 def build_parser():
 
     desc = """
@@ -48,7 +39,9 @@ def build_parser():
                         help="Add Poisson Noise to the zipper")
     parser.add_argument("--xblock", default=1, type=int,
                         help="Block size of zipper in x-direction")
-    # Header options
+    parser.add_argument("--interp_image", action='store', choices=['WGT', 'MSK'], default='MSK',
+                        help="Image to use that define pixels to interpolate over (MSK or WGT)")
+    # Header options for DESDM Framework
     parser.add_argument("--band", default=None, type=str, required=False,
                         help="Add (optional) BAND to SCI header if not present")
     parser.add_argument("--magzero", default=None, type=float, required=False,
@@ -57,7 +50,6 @@ def build_parser():
                         help="Add (optional) TILENAME to SCI header")
     parser.add_argument("--tileid", default=None, type=int, required=False,
                         help="Add (optional) TILE_ID to SCI header")
-
     return parser
 
 def cmdline():
@@ -92,7 +84,6 @@ def merge(**kwargs):
     MSK weight plane created by SWarp.
 
     Felipe Menanteau
-
     """
 
     sci_file    = kwargs.get('sci_file')
@@ -102,13 +93,13 @@ def merge(**kwargs):
     outname     = kwargs.get('outname',False)
     interp_mask = kwargs.get('interp_mask',1)
     xblock      = kwargs.get('xblock',0)
-    #BADPIX_INTERP = kwargs.get('BADPIX_INTERP',maskbits.BADPIX_INTERP)
     BADPIX_INTERP = kwargs.get('BADPIX_INTERP',None)
     # Header options (all optional)
     BAND        = kwargs.get('band',None)
     MAGZERO     = kwargs.get('magzero',None)
     TILENAME    = kwargs.get('tilename',None)
     TILEID      = kwargs.get('tileid',None)
+    interp_image  = kwargs.get('interp_image',None)
 
     if not logger:
         logger = create_logger(level=logging.NOTSET)
@@ -131,20 +122,24 @@ def merge(**kwargs):
     # Make sure that we do not interpolate over zeroes
     MSK  = numpy.where(SCI == 0,0,MSK)
 
-    # Perform column interpolation -- Axis=2
-    if xblock > 0:
-        if BADPIX_INTERP:
-            SCI,MSK = zipp.zipper_interp(SCI,MSK,interp_mask,axis=2, **kwargs)
-            # Interpolate the WGT plane if we don't have a msk_file
-            if not msk_file:
-                WGT,MSK = zipp.zipper_interp(WGT,MSK,interp_mask,axis=2, ydilate=10, **kwargs)
-        else:
-            SCI     = zipp.zipper_interp(SCI,MSK,interp_mask,axis=2, **kwargs)
-            # Interpolate the WGT plane if we don't have a msk_file
-            if not msk_file:
-                WGT     = zipp.zipper_interp(WGT,MSK,interp_mask,axis=2, ydilate=10,**kwargs)
+    # Define the mask we'll use for interpolation
+    if interp_image == 'MSK':
+        MSK_interp = MSK
+    elif interp_image == 'WGT':
+        MSK_interp = numpy.copy(WGT)
+        MSK_interp = numpy.where(MSK_interp == 0,1,0)
+        MSK_interp = numpy.where(SCI == 0,0,MSK_interp)
     else:
-        logger.info("Skipping interpolation -- xblock=0")
+        exit("ERROR: wrong interp_image was passed")
+
+    # Perform column interpolation -- Axis=2 -- only xblock > 0
+    if xblock > 0:
+        SCI  = zipp.zipper_interp(SCI,MSK_interp,interp_mask,axis=2, **kwargs)
+        # Interpolate the WGT plane if we don't have a msk_file
+        if not msk_file:
+            WGT  = zipp.zipper_interp(WGT,MSK_interp,interp_mask,axis=2, ydilate=10,**kwargs)
+    else:
+        logger.info("Skipping interpolation of SCI plane -- xblock=0")
 
     # Update compression settings
     logger.info("Updating compression settings")

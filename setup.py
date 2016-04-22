@@ -31,7 +31,7 @@ libcompressionhdu = SharedLibrary(
 
 # The main call
 setup(name='despyfits',
-      version ='0.3.3',
+      version ='0.3.4',
       license = "GPL",
       description = "A set of handy Python fitsfile-related utility functions for DESDM",
       author = "Felipe Menanteau, Eric Neilsen",
