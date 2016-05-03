@@ -39,6 +39,8 @@ def build_parser():
                         help="Add Poisson Noise to the zipper")
     parser.add_argument("--xblock", default=1, type=int,
                         help="Block size of zipper in x-direction")
+    parser.add_argument("--ydilate", default=0, type=int,
+                        help="Dilate pixels in the y-axis")
     parser.add_argument("--interp_image", action='store', choices=['WGT', 'MSK'], default='MSK',
                         help="Image to use that define pixels to interpolate over (MSK or WGT)")
     # Header options for DESDM Framework
@@ -93,6 +95,7 @@ def merge(**kwargs):
     outname     = kwargs.get('outname',False)
     interp_mask = kwargs.get('interp_mask',1)
     xblock      = kwargs.get('xblock',0)
+    ydilate     = kwargs.get('ydilate',0)
     BADPIX_INTERP = kwargs.get('BADPIX_INTERP',None)
     # Header options (all optional)
     BAND        = kwargs.get('band',None)
@@ -134,12 +137,15 @@ def merge(**kwargs):
 
     # Perform column interpolation -- Axis=2 -- only xblock > 0
     if xblock > 0:
-        SCI  = zipp.zipper_interp(SCI,MSK_interp,interp_mask,axis=2, **kwargs)
+        SCI,MSK_interp = zipp.zipper_interp(SCI,MSK_interp,interp_mask,axis=2,**kwargs)
         # Interpolate the WGT plane if we don't have a msk_file
         if not msk_file:
-            WGT  = zipp.zipper_interp(WGT,MSK_interp,interp_mask,axis=2, ydilate=10,**kwargs)
+            WGT,MSK_interp = zipp.zipper_interp(WGT,MSK_interp,interp_mask,axis=2, ydilate=10,**kwargs)
     else:
         logger.info("Skipping interpolation of SCI plane -- xblock=0")
+
+    # In case the MSK_interp was dilated, we want to pass that info the MSK plane
+    MSK = numpy.where(MSK_interp == 1,1,MSK)
 
     # Update compression settings
     logger.info("Updating compression settings")
