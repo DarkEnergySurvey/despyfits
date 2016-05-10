@@ -140,7 +140,7 @@ def merge(**kwargs):
         SCI,MSK_interp = zipp.zipper_interp(SCI,MSK_interp,interp_mask,axis=2,**kwargs)
         # Interpolate the WGT plane if we don't have a msk_file
         if not msk_file:
-            WGT,MSK_interp = zipp.zipper_interp(WGT,MSK_interp,interp_mask,axis=2, ydilate=10,**kwargs)
+            WGT,MSK_interp = zipp.zipper_interp(WGT,MSK_interp,interp_mask,axis=2,**kwargs)
     else:
         logger.info("Skipping interpolation of SCI plane -- xblock=0")
 
