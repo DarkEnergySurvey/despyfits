@@ -1,0 +1,17 @@
+setupRequired(pyfits 3.3+3)
+setupRequired(fitsio 0.9.8rc1+3)
+setupRequired(despyastro 0.3.6+0)
+setupRequired(despymisc 1.0.1+0)
+
+setupRequired(shlib 2.1.11+2)
+setupRequired(imsupport 7.3.2+1)
+
+envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
+envAppend(PATH, ${PRODUCT_DIR}/bin)
+
+# For EUPS build scripts
+envAppend(LD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
+if (FLAVOR == DarwinX86 || FLAVOR == Darwin) {
+   envPrepend(DYLD_LIBRARY_PATH, ${PRODUCT_DIR}/lib)
+}
+
