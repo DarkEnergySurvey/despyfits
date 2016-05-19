@@ -15,6 +15,9 @@ extern const int badpix_edge = BADPIX_EDGE;
 extern const int badpix_streak = BADPIX_STREAK;
 /* extern const int badpix_fix = BADPIX_FIX;  Should not be in use */
 extern const int badpix_suspect = BADPIX_SUSPECT;
+extern const int badpix_fixed = BADPIX_FIXED;
+extern const int badpix_nearedge = BADPIX_NEAREDGE;
+extern const int badpix_tapebump = BADPIX_TAPEBUMP;
 extern const int badpix_badamp = BADPIX_BADAMP;
 
 /* define BPMDEF bit mappings (for BPM definition) */
