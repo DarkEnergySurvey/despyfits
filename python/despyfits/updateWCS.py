@@ -130,8 +130,8 @@ def slurp_XML(xml,tmpdict, verbose=False, debug=False, translate=True):
 
         if ('FGroups' in tmp_xml_tbl):
             if debug: 
-                for key in tmp_xml_tbl['FGroups']:
-                    print "  %s = %s" % (key,tmp_xml_tbl['FGroups'][key])
+                for key in tmp_xml_tbl['FGroups'][0]:
+                    print "  %s = %s" % (key,tmp_xml_tbl['FGroups'][0][key])
                     
             # Here is where I have defined the current keywords that we can obtain from Scamp XML output.
             # Basiclly each line in key_pairs relates a fits KEYWORD to a field in the XML.
@@ -142,31 +142,31 @@ def slurp_XML(xml,tmpdict, verbose=False, debug=False, translate=True):
 
             # Check for presence of each key.  If exists then try to parse based on type expected
             for key in key_pairs:
-                if (key_pairs[key]['fld'] in tmp_xml_tbl['FGroups']):
+                if (key_pairs[key]['fld'] in tmp_xml_tbl['FGroups'][0]):
                     if (key_pairs[key]['type'] == "str"):
-                        keyval=unicodedata.normalize('NFKD',tmp_xml_tbl['FGroups'][key_pairs[key]['fld']]).encode('ascii','ignore')
+                        keyval=unicodedata.normalize('NFKD',tmp_xml_tbl['FGroups'][0][key_pairs[key]['fld']]).encode('ascii','ignore')
                         tmpdict[key]=[keyval,key_pairs[key]['comment']]
                     elif (key_pairs[key]['type'] == 'float'):
                         try:
-                            keyval=float(tmp_xml_tbl['FGroups'][key_pairs[key]['fld']])
+                            keyval=float(tmp_xml_tbl['FGroups'][0][key_pairs[key]['fld']])
                             tmpdict[key]=[keyval,key_pairs[key]['comment']]
                         except:
                             try:
-                                keyval=float(unicodedata.normalize('NFKD',tmp_xml_tbl['FGroups'][key_pairs[key]['fld']]).encode('ascii','ignore'))
+                                keyval=float(unicodedata.normalize('NFKD',tmp_xml_tbl['FGroups'][0][key_pairs[key]['fld']]).encode('ascii','ignore'))
                                 tmpdict[key]=[keyval,key_pairs[key]['comment']]
                             except:
-                                print 'Failed to parse value for %s = %s as float (skipping)' % ( key_pairs[key]['fld'], mp_xml_tbl['FGroups'][key_pairs[key]['fld']])
+                                print 'Failed to parse value for %s = %s as float (skipping)' % ( key_pairs[key]['fld'], mp_xml_tbl['FGroups'][0][key_pairs[key]['fld']])
                                 pass
                     elif (key_pairs[key]['type'] == 'int'):
                         try:
-                            keyval=int(tmp_xml_tbl['FGroups'][key_pairs[key]['fld']])
+                            keyval=int(tmp_xml_tbl['FGroups'][0][key_pairs[key]['fld']])
                             tmpdict[key]=[keyval,key_pairs[key]['comment']]
                         except:
                             try:
-                                keyval=int(unicodedata.normalize('NFKD',tmp_xml_tbl['FGroups'][key_pairs[key]['fld']]).encode('ascii','ignore'))
+                                keyval=int(unicodedata.normalize('NFKD',tmp_xml_tbl['FGroups'][0][key_pairs[key]['fld']]).encode('ascii','ignore'))
                                 tmpdict[key]=[keyval,key_pairs[key]['comment']]
                             except:
-                                print 'Failed to parse value for %s = %s as int (skipping)' % (key_pairs[key]['fld'], mp_xml_tbl['FGroups'][key_pairs[key]['fld']])
+                                print 'Failed to parse value for %s = %s as int (skipping)' % (key_pairs[key]['fld'], mp_xml_tbl['FGroups'][0][key_pairs[key]['fld']])
                                 pass
                     else:
                         print 'Unspecified value type for XML parsing of keywords (skipping)'
