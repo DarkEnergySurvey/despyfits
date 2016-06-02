@@ -17,7 +17,7 @@ import platform
 import subprocess
 from collections import OrderedDict
 
-__all__ ['parse_badpix_mask']
+__all__ = ['parse_badpix_mask']
 
 lib_ext = {'Linux': 'so',
            'Darwin': 'dylib'}
