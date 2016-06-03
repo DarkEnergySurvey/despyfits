@@ -1,9 +1,9 @@
-setupRequired(pyfits 3.3+3)
-setupRequired(fitsio 0.9.8rc1+3)
-setupRequired(despyastro 0.3.7+0)
-setupRequired(despymisc 1.0.2+0)
+setupRequired(pyfits 3.3+4)
+setupRequired(fitsio 0.9.8rc1+4)
+setupRequired(despyastro 0.3.7+1)
+setupRequired(despymisc 1.0.3+1)
 
-setupRequired(shlib 2.1.11+2)
+setupRequired(shlib 2.1.11+3)
 setupRequired(imsupport 7.3.2+1)
 
 envAppend(PYTHONPATH, ${PRODUCT_DIR}/python)
