@@ -8,9 +8,16 @@ export PRODUCT_DIR=$HOME/build-test/despyfits
 echo "Will Install to: $PRODUCT_DIR"
 
 source $EUPS_DIR/desdm_eups_setup.sh
-source source_me_before_compile.sh
+setup -v pyfits 3.3+4
+setup -v fitsio 0.9.8rc1+4 
+setup -v despyastro 0.3.7+1 
+setup -v despymisc 1.0.3+1
+setup -v shlib 2.1.11+3 
+# setup -v imsupport 7.3.2+1
 
-#setup -v -r .
+# to build against a recent imsupport
+setup -v -r $HOME/build-test/imsupport
+
 export PYTHONPATH=$PRODUCT_DIR/python:$PYTHONPATH
 python setup.py install --prefix=$PRODUCT_DIR --install-lib=$PRODUCT_DIR/python
 
