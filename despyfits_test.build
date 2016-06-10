@@ -13,10 +13,10 @@ setup -v fitsio 0.9.8rc1+4
 setup -v despyastro 0.3.7+1 
 setup -v despymisc 1.0.3+1
 setup -v shlib 2.1.11+3 
-# setup -v imsupport 7.3.2+1
+setup -v imsupport 7.5.0+0
 
 # to build against a recent imsupport
-setup -v -r $HOME/build-test/imsupport
+#setup -v -r $HOME/build-test/imsupport
 
 export PYTHONPATH=$PRODUCT_DIR/python:$PYTHONPATH
 python setup.py install --prefix=$PRODUCT_DIR --install-lib=$PRODUCT_DIR/python
