@@ -50,7 +50,7 @@ def build_parser():
     parser.add_argument("--interp_image", action='store', choices=['WGT', 'MSK'], default='MSK',
                         help="Image to use that define pixels to interpolate over (MSK or WGT)")
     parser.add_argument("--region_file", default=None, type=str, required=False,
-                        help="Write ds9 region file with interpolated are")
+                        help="Write ds9 region file with interpolated region")
 
     # Keep zeros in SCI (yes/no)
     group = parser.add_mutually_exclusive_group(required=False)
