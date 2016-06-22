@@ -22,6 +22,7 @@ def build_parser():
     containing the SCI/MSK/WGT planes. Interpolates the SCI plane
     using information in the 'custom'-weight mask, and also creates the MSK
     plane to be used by SExtractor for IMAFLAG_ISO.
+    Felipe Menanteau (NCSA)
     """
 
     parser = argparse.ArgumentParser(description=desc)
@@ -39,10 +40,25 @@ def build_parser():
                         help="Add Poisson Noise to the zipper")
     parser.add_argument("--xblock", default=1, type=int,
                         help="Block size of zipper in x-direction")
+    parser.add_argument("--yblock", default=1, type=int,
+                        help="Block size of zipper in y-direction")
     parser.add_argument("--ydilate", default=0, type=int,
                         help="Dilate pixels in the y-axis")
+    parser.add_argument("--maxcols",dest="DEFAULT_MAXCOLS", default=100, type=int,
+                        help="Widest feature to interpolate.  Default=None means no limit.")
+    parser.add_argument("--mincols",dest="DEFAULT_MINCOLS", default=1, type=int,
+                        help="Narrowest feature to interpolate.")
     parser.add_argument("--interp_image", action='store', choices=['WGT', 'MSK'], default='MSK',
                         help="Image to use that define pixels to interpolate over (MSK or WGT)")
+    parser.add_argument("--region_file", default=None, type=str, required=False,
+                        help="Write ds9 region file with interpolated region")
+
+    # Keep zeros in SCI (yes/no)
+    group = parser.add_mutually_exclusive_group(required=False)
+    group.add_argument('--keep_sci_zeros',    dest='keep_sci_zeros', action='store_true', default=True,
+                       help="Keep zeros in SCI frame")
+    group.add_argument('--no-keep_sci_zeros', dest='keep_sci_zeros', action='store_false')
+
     # Header options for DESDM Framework
     parser.add_argument("--band", default=None, type=str, required=False,
                         help="Add (optional) BAND to SCI header if not present")
@@ -103,9 +119,12 @@ def merge(**kwargs):
     TILENAME    = kwargs.get('tilename',None)
     TILEID      = kwargs.get('tileid',None)
     interp_image  = kwargs.get('interp_image',None)
+    keep_sci_zeros = kwargs.get('keep_sci_zeros',True) 
+    # The rest (and most) will be passed as kwargs to the zipper interpolation routine
 
     if not logger:
         logger = create_logger(level=logging.NOTSET)
+        kwargs['logger'] = logger # Add logger to kwargs to pass on
         
     logger.info("Reading in %s" % sci_file)
     SCI,sci_hdr = fitsio.read(sci_file, ext=0, header=True)
@@ -122,9 +141,13 @@ def merge(**kwargs):
         MSK = numpy.where(MSK == 0,1,0)
         msk_hdr = wgt_hdr
 
-    # Make sure that we do not interpolate over zeroes
-    MSK  = numpy.where(SCI == 0,0,MSK)
-
+    # Make sure that we do not interpolate over zeroes on the SCI frame
+    if keep_sci_zeros:
+        logger.info("Preserving zeros in SCI frame")
+        MSK  = numpy.where(SCI == 0,0,MSK)
+    else:
+        logger.info("Ignoring zeros in SCI frame")
+        
     # Define the mask we'll use for interpolation
     if interp_image == 'MSK':
         MSK_interp = MSK
