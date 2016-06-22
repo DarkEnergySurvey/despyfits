@@ -22,6 +22,7 @@ def build_parser():
     containing the SCI/MSK/WGT planes. Interpolates the SCI plane
     using information in the 'custom'-weight mask, and also creates the MSK
     plane to be used by SExtractor for IMAFLAG_ISO.
+    Felipe Menanteau (NCSA)
     """
 
     parser = argparse.ArgumentParser(description=desc)
@@ -119,10 +120,11 @@ def merge(**kwargs):
     TILEID      = kwargs.get('tileid',None)
     interp_image  = kwargs.get('interp_image',None)
     keep_sci_zeros = kwargs.get('keep_sci_zeros',True) 
+    # The rest (and most) will be passed as kwargs to the zipper interpolation routine
 
     if not logger:
         logger = create_logger(level=logging.NOTSET)
-        kwargs['logger'] = logger
+        kwargs['logger'] = logger # Add logger to kwargs to pass on
         
     logger.info("Reading in %s" % sci_file)
     SCI,sci_hdr = fitsio.read(sci_file, ext=0, header=True)
