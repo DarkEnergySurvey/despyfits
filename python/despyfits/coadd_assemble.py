@@ -176,6 +176,13 @@ def merge(**kwargs):
     msk_hdr = DESImage.update_hdr_compression(msk_hdr,'MSK')
     wgt_hdr = DESImage.update_hdr_compression(wgt_hdr,'WGT')
 
+    # Use special compression when COMBINE_TYPE is 'CHI-MEAN' 
+    if wgt_hdr.get('COMBINET') == 'CHI-MEAN': 
+        logger.info("Overriding compression settings for WGT with 'CHI-MEAN' COMBINET will use GZIP")
+        wgt_hdr['FZALGOR'] = 'GZIP_1'
+        wgt_hdr['FZQVALUE'] = 0
+        wgt_hdr['FZQMETHD'] = 'NO_DITHER'
+
     # Add corners, centers and extend
     logger.info("Updating Image Corners")
     sci_hdr = CCD_corners.update_DESDM_corners(sci_hdr,get_extent=True, verb=False)

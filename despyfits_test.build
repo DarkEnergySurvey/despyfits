@@ -8,9 +8,9 @@ export PRODUCT_DIR=$HOME/build-test/despyfits
 echo "Will Install to: $PRODUCT_DIR"
 
 source $EUPS_DIR/desdm_eups_setup.sh
-setup -v pyfits 3.3+4
-setup -v fitsio 0.9.8rc1+4 
-setup -v despyastro 0.3.8+0
+setup -v pyfits 3.3+5
+setup -v fitsio 0.9.8rc1+5 
+setup -v despyastro 0.3.8+1
 setup -v despymisc 1.0.3+1
 setup -v shlib 2.1.11+3 
 setup -v imsupport 7.5.0+0
