@@ -204,6 +204,8 @@ def cmdline():
     parser.add_argument('--xml',          action='store', type=str, default=None, help='obtain limited QA info from SCAMP XML output (optional)')
     parser.add_argument('--debug',        action='store_true', default=False, help='Full debug information to stdout')
     parser.add_argument('-v','--verbose', action='store_true', default=False, help='Flag to produce more verbose output')
+    parser.add_argument('--desepoch',     action='store', type=str, default=None, help='Optional DESEPOCH value to add to the SCI header')
+    
 
     args = parser.parse_args()
     if (args.verbose):
@@ -249,6 +251,11 @@ def run_updateWCS(args):
         new_record = slurp_XML(args.xml,new_record, verbose=args.verbose, debug=args.debug, translate=True)
     else:
         new_record = []
+
+    # if desepoch, add DESPOCH record
+    if args.desepoch:
+        desepoch_rec = {'name': 'DESEPOCH', 'value':args.desepoch, 'comment':'DES Observing epoch'}
+        new_record.append(desepoch_rec)
 
     # Read in the input fits file using despyfits.DESImage
     input_image = DESImage.load(args.input)
