@@ -252,16 +252,17 @@ def run_updateWCS(args):
     else:
         new_record = []
 
-    # if desepoch, add DESPOCH record
-    if args.desepoch:
-        desepoch_rec = {'name': 'DESEPOCH', 'value':args.desepoch, 'comment':'DES Observing epoch'}
-        new_record.append(desepoch_rec)
-
     # Read in the input fits file using despyfits.DESImage
     input_image = DESImage.load(args.input)
 
     # run the main header updater
     input_image = run_update(input_image,headfile=args.headfile,hdupcfg=args.hdupcfg,verbose=args.verbose,new_record=new_record)
+
+    # if desepoch option, we add a DESPOCH record only the SCI plane
+    if args.desepoch:
+        desepoch_rec = {'name': 'DESEPOCH', 'value':args.desepoch, 'comment':'DES Observing epoch'}
+        print "(updateWCS): Appending DESEPOCH to new record"
+        input_image.header.add_record(desepoch_rec)
 
     # Saving the image as args.output, we compute the corners at write time
     print "(updateWCS): Closing/Saving image --> %s" % args.output
