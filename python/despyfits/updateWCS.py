@@ -261,7 +261,7 @@ def run_updateWCS(args):
     # if desepoch option, we add a DESPOCH record only the SCI plane
     if args.desepoch:
         desepoch_rec = {'name': 'DESEPOCH', 'value':args.desepoch, 'comment':'DES Observing epoch'}
-        print "(updateWCS): Appending DESEPOCH to new record"
+        print "(updateWCS): Updating DESEPOCH=%s to SCI header" % args.desepoch
         input_image.header.add_record(desepoch_rec)
 
     # Saving the image as args.output, we compute the corners at write time
