@@ -1,18 +1,18 @@
-#!/usr/bin/env python
 """Class to manage all images in a focal plane
 """
-from despyfits.DESImage import DESDataImage, DESImage, DESImageCStruct
-from despyfits.DESImage import CCDNUM2, data_dtype
-from despyfits.DESFITSInventory import DESFITSInventory
 from fitsio import FITS
 import numpy as np
 
+from despyfits.DESImage import DESDataImage, DESImage, DESImageCStruct
+from despyfits.DESImage import CCDNUM2, data_dtype
+from despyfits.DESFITSInventory import DESFITSInventory
+
 FocalPlaneCStructArray = DESImageCStruct * CCDNUM2
 
-class DESFocalPlaneImages(object):
+class DESFocalPlaneImages:
 
-    def __init__(self, 
-                 init_data=False, 
+    def __init__(self,
+                 init_data=False,
                  shape=(4096, 2048)):
         if init_data:
             self.images = [DESDataImage(np.zeros(shape, dtype=data_dtype))
@@ -37,7 +37,7 @@ class DESFocalPlaneImages(object):
 
     @property
     def cstruct(self):
-        num_dummy_structs = NUMCCD2-len(self.images)
+        num_dummy_structs = NUMCCD2 - len(self.images)
         im_cstructs = [im.cstruct for im in self.images] \
                       + [DESImageCStruct() for i in range(num_dummy_structs)]
         fc_im_array = FocalPlaneCStructArray(*im_cstructs)

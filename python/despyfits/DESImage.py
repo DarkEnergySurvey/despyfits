@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """Class to manage DES images
 
 In this context, "image" means the data from one CCD from one exposure,
@@ -13,7 +12,6 @@ import ctypes
 import re
 from collections import namedtuple
 from tempfile import mkdtemp
-from os import path
 import shutil
 import os
 
@@ -37,20 +35,14 @@ data_dtype = np.dtype(np.float32)
 pass_fortran = False
 # Indirect-write behaviour based on the enviroment variables
 # 1. For use_indirect_write
-if os.environ.get('DESPYFITS_USE_INDIRECT_WRITE'):
-    use_indirect_write = True
-else:
-    use_indirect_write = False
+use_indirect_write = os.environ.get('DESPYFITS_USE_INDIRECT_WRITE') is not None
 # 2. For indirect_write_prefix
-if os.environ.get('DESPYFITS_INDIRECT_WRITE_PREFIX'):
+if os.environ.get('DESPYFITS_INDIRECT_WRITE_PREFIX') is not None:
     indirect_write_prefix = os.environ.get('DESPYFITS_INDIRECT_WRITE_PREFIX')
 else:
     indirect_write_prefix = '/tmp/desimage-'
 # 3. For adding DESDM_PIPEPROD/DESDM_PIPERVER keys
-if os.environ.get('DESPYFITS_PIPEKEYS_WRITE'):
-    pipekeys_write = True
-else:
-    pipekeys_write = False
+pipekeys_write = os.environ.get('DESPYFITS_PIPEKEYS_WRITE') is not None
 
 mask_is_unsigned = False
 if mask_is_unsigned:
@@ -71,6 +63,7 @@ if len(logger.handlers) < 0:
 class MissingData(Exception):
     def __init__(self, value):
         self.value = value
+        super().__init__()
     def __str__(self):
         return repr(self.value)
 
@@ -83,18 +76,21 @@ class MissingWeight(Exception):
 class UnexpectedDesExt(Exception):
     def __init__(self, value):
         self.value = value
+        super().__init__()
     def __str__(self):
         return repr(self.value)
 
 class MissingFITSKeyword(Exception):
     def __init__(self, value):
         self.value = value
+        super().__init__()
     def __str__(self):
         return repr(self.value)
 
 class BadFITSSectionSpec(Exception):
     def __init__(self, value):
         self.value = value
+        super().__init__()
     def __str__(self):
         return repr(self.value)
 
@@ -122,7 +118,7 @@ def indirect_write(fname_idx):
             param_list = list(param_tuple)
             dest_fname = param_tuple[fname_idx]
             tmp_dir = mkdtemp(prefix=indirect_write_prefix)
-            tmp_fname = path.join(tmp_dir, path.basename(dest_fname))
+            tmp_fname = os.path.join(tmp_dir, os.path.basename(dest_fname))
             param_list[fname_idx] = tmp_fname
             param_tuple = tuple(param_list)
             try:
@@ -147,25 +143,25 @@ def indirect_write(fname_idx):
 
 # classes
 
-class HeaderDifference(object):
+class HeaderDifference:
     def __init__(self, im1, im2):
         self.match = {}
         self.diff = {}
 
         for k in set(im1.header.keys()) | set(im2.header.keys()):
-            if len(k)>8:
+            if len(k) > 8:
                 # Invalid FITS keyword
                 continue
 
             v = [None, None]
 
-            if k in im1.header.keys():
+            if k in im1.header:
                 v[0] = im1.header[k]
-            if k in im2.header.keys():
+            if k in im2.header:
                 v[1] = im2.header[k]
 
 
-            if not v[0]==v[1]:
+            if v[0] != v[1]:
                 self.diff[k] = v
             else:
                 self.match[k] = v[0]
@@ -178,14 +174,17 @@ class HeaderDifference(object):
             s += "       im2=>" + str(self.diff[k][1]) + "<=\n"
         return s
 
-class DESSingleImage(object):
+class DESSingleImage:
+
+    def __init__(self):
+        self.header = FITSHDR({})
+        self.pri_hdr = FITSHDR({})
 
     # If we index this object, assume we are after keywords in the header
     def __getitem__(self, key):
-        if key in self.header.keys():
+        if key in self.header:
             return self.header[key]
-        else:
-            return self.pri_hdr[key]
+        return self.pri_hdr[key]
 
     def __setitem__(self, key, value):
         self.header[key] = value
@@ -197,7 +196,9 @@ class DESSingleImage(object):
         if comment is None:
             self.header[key] = value
         else:
-            self.header.add_record( {'name':key, 'value':value, 'comment':comment})
+            self.header.add_record({'name': key,
+                                    'value': value,
+                                    'comment': comment})
 
 class DESDataImage(DESSingleImage):
 
@@ -210,6 +211,7 @@ class DESDataImage(DESSingleImage):
             - `pri_hdr`: the primary header of the FITS file
 
         """
+        super().__init__()
         self.data = data
         self.sourcefile = sourcefile
 
@@ -292,10 +294,9 @@ class DESDataImage(DESSingleImage):
             try:
                 value = source[kw]
                 self.header[kw] = value
-            except (ValueError,KeyError):
+            except (ValueError, KeyError):
                 if require:
                     raise KeyError('copy_header_info did not find required keyword ' + kw)
-        return
 
     @property
     def cstruct(self):
@@ -321,8 +322,10 @@ class DESImage(DESDataImage):
         In mast cases, DESImage.create or DESImage.load will be safer
         and more covenient.
         """
+        super().__init__(data=np.zeros(shape, dtype=data_dtype) if init_data else None,
+                         sourcefile=sourcefile)
 
-        self.data = np.zeros(shape, dtype=data_dtype) if init_data else None
+        #self.data = np.zeros(shape, dtype=data_dtype) if init_data else None
 
         self.mask = None
         if init_mask:
@@ -333,11 +336,11 @@ class DESImage(DESDataImage):
             self.init_weight()
 
         self.variance = None
-        self.header = FITSHDR({})
-        self.pri_hdr = self.header
+        #self.header = FITSHDR({})
+        #self.pri_hdr = self.header
         self.mask_hdr = FITSHDR({})
         self.weight_hdr = FITSHDR({})
-        self.sourcefile = sourcefile
+        #self.sourcefile = sourcefile
 
     @classmethod
     def create(cls, data_im, mask=None, weight=None):
@@ -411,15 +414,15 @@ class DESImage(DESDataImage):
             ccd_hdus = set(fits_inventory.ccd_hdus(ccdnum))
             data_hdus = sorted(set(data_hdus) & ccd_hdus)
 
-        if len(data_hdus)==0:
+        if not data_hdus:
             data_hdus = fits_inventory.raws
             if ccdnum is not None:
                 data_hdus = sorted(set(data_hdus) & ccd_hdus)
 
         # Create the new object
-        if len(data_hdus)>0:
+        if data_hdus:
             ext = data_hdus[0]
-            logger.info("Loading data from HDU %d" % ext)
+            logger.info("Loading data from HDU %d", ext)
             data_im = DESDataImage.load(filename, image_hdu=ext)
             im = cls.create(data_im)
         else:
@@ -432,9 +435,9 @@ class DESImage(DESDataImage):
 
         if len(fits_inventory.masks) > 1:
             raise TooManyMaskHDUs
-        elif len(fits_inventory.masks) == 1:
+        if len(fits_inventory.masks) == 1:
             ext = fits_inventory.masks[0]
-            logger.info("Loading mask from HDU %d" % ext)
+            logger.info("Loading mask from HDU %d", ext)
             im.mask, im.mask_hdr = fitsio.read(
                 filename, ext=ext, header=True)
         elif assign_default_mask:
@@ -446,9 +449,9 @@ class DESImage(DESDataImage):
 
         if len(fits_inventory.weights) > 1:
             raise TooManyWeightHDUs
-        elif len(fits_inventory.weights) == 1:
+        if len(fits_inventory.weights) == 1:
             ext = fits_inventory.weights[0]
-            logger.info("Loading weights from HDU %d" % ext)
+            logger.info("Loading weights from HDU %d", ext)
             if wgt_is_variance:
                 im.variance, im.weight_hdr = fitsio.read(
                     filename, ext=ext, header=True)
@@ -529,35 +532,35 @@ class DESImage(DESDataImage):
 
             for hdu in range(max_init_hdu, max_hdu+1):
 
-                if hdu==data_hdu and save_data:
+                if hdu == data_hdu and save_data:
                     # Update the hdr with the proper FZ keywords
-                    logger.info("Creating SCI HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % data_hdu)
-                    self.header = update_hdr_compression(self.header,'SCI')
+                    logger.info("Creating SCI HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords", data_hdu)
+                    self.header = update_hdr_compression(self.header, 'SCI')
                     # Calculate coordinates for ccd center and corners and update the header
-                    logger.info("Calculating CCD corners/center/extern keywords for SCI HDU %d " % data_hdu)
-                    self.header = update_DESDM_corners(self.header,get_extent=True, verb=False)
+                    logger.info("Calculating CCD corners/center/extern keywords for SCI HDU %d ", data_hdu)
+                    self.header = update_DESDM_corners(self.header, get_extent=True, verb=False)
                     if pipekeys_write:
                         logger.info("Inserting EUPS PIPEPROD and PIPEVER to SCI HDU")
                         self.header = insert_eupspipe(self.header)
-                    fits.write(self.data,extname='SCI',header=self.header)
+                    fits.write(self.data, extname='SCI', header=self.header)
                     save_data = False
-                elif has_mask and hdu==mask_hdu and save_mask:
+                elif has_mask and hdu == mask_hdu and save_mask:
                     # Update the hdr with the proper FZ keywords
-                    logger.info("Creating MSK HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % mask_hdu)
-                    self.mask_hdr = update_hdr_compression(self.mask_hdr,'MSK')
+                    logger.info("Creating MSK HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords", mask_hdu)
+                    self.mask_hdr = update_hdr_compression(self.mask_hdr, 'MSK')
                     # Calculate coordinates for ccd center and corners and update the header
-                    logger.info("Calculating CCD corners/center/extern keywords for MSK HDU %d " % mask_hdu)
-                    self.mask_hdr = update_DESDM_corners(self.mask_hdr,get_extent=True, verb=False)
-                    fits.write(self.mask,extname='MSK',header=self.mask_hdr)
+                    logger.info("Calculating CCD corners/center/extern keywords for MSK HDU %d ", mask_hdu)
+                    self.mask_hdr = update_DESDM_corners(self.mask_hdr, get_extent=True, verb=False)
+                    fits.write(self.mask, extname='MSK', header=self.mask_hdr)
                     save_mask = False
-                elif has_weight and hdu==weight_hdu and save_weight:
-                    logger.info("Creating WGT HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords" % weight_hdu)
+                elif has_weight and hdu == weight_hdu and save_weight:
+                    logger.info("Creating WGT HDU %d and relevant FZ*/DES_EXT/EXTNAME keywords", weight_hdu)
                     # Update the hdr with the proper FZ keywords
-                    self.weight_hdr = update_hdr_compression(self.weight_hdr,'WGT')
-                    fits.write(self.weight,extname='WGT',header=self.weight_hdr)
+                    self.weight_hdr = update_hdr_compression(self.weight_hdr, 'WGT')
+                    fits.write(self.weight, extname='WGT', header=self.weight_hdr)
                     save_weight = False
                 else:
-                    fits.create_image_hdu(np.zeros((1,1)), extname='DUMMY')
+                    fits.create_image_hdu(np.zeros((1, 1)), extname='DUMMY')
 
             if save_data:
                 hdr = fits[data_hdu].read_header()
@@ -575,7 +578,7 @@ class DESImage(DESDataImage):
                     if self.mask_hdr['DES_EXT'].rstrip() != 'MASK':
                         raise UnexpectedDesExt('mask not in expected HDU')
                 else:
-                    self.mask_hdr['DES_EXT']='MASK'
+                    self.mask_hdr['DES_EXT'] = 'MASK'
 
                 fits[mask_hdu].write(self.mask)
                 fits[mask_hdu].write_keys(self.mask_hdr)
@@ -589,7 +592,7 @@ class DESImage(DESDataImage):
                     if self.weight_hdr['DES_EXT'].rstrip() != 'WEIGHT':
                         raise UnexpectedDesExt('weight not in expected HDU')
                 else:
-                    self.weight_hdr['DES_EXT']='WEIGHT'
+                    self.weight_hdr['DES_EXT'] = 'WEIGHT'
 
                 fits[weight_hdu].write(self.weight)
                 fits[weight_hdu].write_keys(self.weight_hdr)
@@ -620,12 +623,12 @@ class DESImage(DESDataImage):
 
         diff_im = DESImage()
         for ext, im1, im2 in hdus:
-            if ext=='science':
-                diff_im.data = im1-im2
-            elif ext=='mask':
+            if ext == 'science':
+                diff_im.data = im1 - im2
+            elif ext == 'mask':
                 diff_im.mask = np.bitwise_xor(im1, im2)
-            elif ext=='weight':
-                diff_im.weight = im1-im2
+            elif ext == 'weight':
+                diff_im.weight = im1 - im2
 
         comparison = DESImageComparison(header_diff, diff_im)
         return comparison
@@ -671,11 +674,11 @@ class DESBPMImage(DESSingleImage):
         if bpm_hdu is None:
             fits_inventory = DESFITSInventory(filename)
             hdus = fits_inventory.bpms
-            if len(hdus)>1:
+            if len(hdus) > 1:
                 raise TooManyMaskHDUs
             ext = hdus[0]
         else:
-            ext = dbm_hdu
+            ext = bpm_hdu
 
         data, header = fitsio.read(filename, ext=ext, header=True)
 
@@ -713,91 +716,71 @@ DESImageComparisonNT = namedtuple('DESImageComparisonNT',
 class DESImageComparison(DESImageComparisonNT):
     @property
     def mismatched_keywords(self):
-        mk = set(
-            [k for k in self.header.diff] )
-        return mk
+        return set([k for k in self.header.diff])
 
     @property
     def data_match(self):
-        m = np.count_nonzero(self.diff_im.data) == 0
-        return m
+        return np.count_nonzero(self.diff_im.data) == 0
 
     @property
     def mask_match(self):
-        m = np.count_nonzero(self.diff_im.mask) == 0
-        return m
+        return np.count_nonzero(self.diff_im.mask) == 0
 
     @property
     def weight_match(self):
-        m = np.count_nonzero(self.diff_im.weight) == 0
-        return m
+        return np.count_nonzero(self.diff_im.weight) == 0
 
     def match(self, ignore=set()):
         differing_keywords = self.mismatched_keywords - set(ignore)
 
-        m = len(differing_keywords)==0 \
+        return len(differing_keywords) == 0 \
             and self.data_match and self.weight_match and self.mask_match
 
-        return m
-
-    def log(self, logger, ref):
-        logger.debug('Image size: %d', self.diff_im.data.size)
-        logger.debug('Data differences: %d',
-                     np.count_nonzero(self.diff_im.data))
-        logger.debug('Weight differences: %d',
-                     np.count_nonzero(self.diff_im.weight))
-        logger.debug(
-            'BADPIX_BPM differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_BPM),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_BPM))
-        logger.debug(
-            'BADPIX_SATURATE differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_SATURATE),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_SATURATE))
-        logger.debug(
-            'BADPIX_INTERP differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_INTERP),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_INTERP))
-        logger.debug(
-            'BADPIX_THRESHOLD differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_THRESHOLD),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_THRESHOLD))
-        logger.debug(
-            'BADPIX_LOW differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_LOW),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_LOW))
-        logger.debug(
-            'BADPIX_CRAY differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_CRAY),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_CRAY))
-        logger.debug(
-            'BADPIX_STAR differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_STAR),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_STAR))
-        logger.debug(
-            'BADPIX_TRAIL differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_TRAIL),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_TRAIL))
-        logger.debug(
-            'BADPIX_EDGEBLEED differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_EDGEBLEED),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_EDGEBLEED))
-        logger.debug(
-            'BADPIX_SSXTALK differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_SSXTALK),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_SSXTALK))
-        logger.debug(
-            'BADPIX_EDGE differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_EDGE),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_EDGE))
-        logger.debug(
-            'BADPIX_STREAK differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_STREAK),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_STREAK))
-        logger.debug(
-            'BADPIX_FIX differences: %d/%d',
-            np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_FIX),
-            np.count_nonzero(ref.mask & maskbits.BADPIX_FIX))
+    def log(self, _logger, ref):
+        _logger.debug('Image size: %d', self.diff_im.data.size)
+        _logger.debug('Data differences: %d',
+                      np.count_nonzero(self.diff_im.data))
+        _logger.debug('Weight differences: %d',
+                      np.count_nonzero(self.diff_im.weight))
+        _logger.debug('BADPIX_BPM differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_BPM),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_BPM))
+        _logger.debug('BADPIX_SATURATE differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_SATURATE),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_SATURATE))
+        _logger.debug('BADPIX_INTERP differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_INTERP),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_INTERP))
+        _logger.debug('BADPIX_THRESHOLD differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_THRESHOLD),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_THRESHOLD))
+        _logger.debug('BADPIX_LOW differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_LOW),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_LOW))
+        _logger.debug('BADPIX_CRAY differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_CRAY),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_CRAY))
+        _logger.debug('BADPIX_STAR differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_STAR),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_STAR))
+        _logger.debug('BADPIX_TRAIL differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_TRAIL),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_TRAIL))
+        _logger.debug('BADPIX_EDGEBLEED differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_EDGEBLEED),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_EDGEBLEED))
+        _logger.debug('BADPIX_SSXTALK differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_SSXTALK),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_SSXTALK))
+        _logger.debug('BADPIX_EDGE differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_EDGE),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_EDGE))
+        _logger.debug('BADPIX_STREAK differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_STREAK),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_STREAK))
+        _logger.debug('BADPIX_FIX differences: %d/%d',
+                      np.count_nonzero(self.diff_im.mask & maskbits.BADPIX_FIX),
+                      np.count_nonzero(ref.mask & maskbits.BADPIX_FIX))
 
 
 def scan_fits_section(hdr, keyword):
@@ -828,13 +811,13 @@ def section2slice(section, reorder=False):
     if len(m.groups()) != 4:
         raise BadFITSSectionSpec("%s" % section)
     values = [int(s) for s in m.groups()]
-    if reorder and values[1]<values[0]:
-        values[0],values[1] = values[1],values[0]
-    if reorder and values[3]<values[2]:
-        values[2],values[3] = values[3],values[2]
+    if reorder and values[1] < values[0]:
+        values[0], values[1] = values[1], values[0]
+    if reorder and values[3] < values[2]:
+        values[2], values[3] = values[3], values[2]
 
-    return (slice(values[2]-1,values[3]),
-            slice(values[0]-1,values[1]))
+    return (slice(values[2] - 1, values[3]),
+            slice(values[0] - 1, values[1]))
 
 
 def slice2section(s):
@@ -850,7 +833,7 @@ def slice2section(s):
       - string-valued IRAF/FITS section specification
     """
     values = (s[1].start, s[1].stop, s[0].start, s[0].stop)
-    if None in values or np.any(np.array(values)<0):
+    if None in values or np.any(np.array(values) < 0):
         raise BadFITSSectionSpec("Bad slice2section input: " + str(s))
     return "[%d:%d,%d:%d]" % values
 
@@ -860,7 +843,7 @@ try:
     libdesimage = ctypes.CDLL(
         'libdesimage.' + lib_ext[platform.system()])
 except KeyError:
-    raise RuntimeError, ("Unknown platform: " + platform.system())
+    raise RuntimeError("Unknown platform: " + platform.system())
 
 
 set_desimage = libdesimage.set_desimage
@@ -897,6 +880,7 @@ class DESImageCStruct(ctypes.Structure):
     ]
 
     def __init__(self, im=None):
+        super().__init__()
         if im is not None:
             self.create(im)
         else:
@@ -928,7 +912,7 @@ class DESImageCStruct(ctypes.Structure):
         def get_header_value(keyword, default):
             missing = (keyword not in im.header) and (keyword not in im.pri_hdr)
             if missing:
-                logging.warning("Keyword " + keyword + " not defined")
+                logging.warning("Keyword %s not defined", keyword)
 
             value = default if missing else im[keyword]
             return value
@@ -998,16 +982,16 @@ class DESImageCStruct(ctypes.Structure):
         set_desimage.argtypes = [
             ctypes.POINTER(ctypes.c_float) if not has_data else
             np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                   flags = npflags),
+                                   flags=npflags),
             ctypes.POINTER(ctypes.c_float) if not has_variance else
             np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                   flags = npflags),
+                                   flags=npflags),
             ctypes.POINTER(ctypes.c_float) if not has_weight else
             np.ctypeslib.ndpointer(ctypes.c_float, ndim=2, shape=im_shape,
-                                   flags = npflags),
+                                   flags=npflags),
             ctypes.POINTER(mask_ctype) if not has_mask else
             np.ctypeslib.ndpointer(mask_ctype, ndim=2, shape=im_shape,
-                                   flags = npflags),
+                                   flags=npflags),
             ctypes.POINTER(DESImageCStruct)
         ]
 
@@ -1031,7 +1015,7 @@ def localize_numpy_array(data, new_dtype=None):
     return local_data
 
 
-def update_hdr_compression(hdr,extname):
+def update_hdr_compression(hdr, extname):
 
     # Translator for DES_EXT -- FM says: This sets of definitions should be centralized.
     DES_EXT = {
@@ -1042,15 +1026,27 @@ def update_hdr_compression(hdr,extname):
 
     # Create FITSHDR records with comments to insert into the header
     records = [
-        {'name': 'EXTNAME', 'value':extname,         'comment':'Name of the extension'},
-        {'name': 'DES_EXT', 'value':DES_EXT[extname],'comment':'DES name of the extension'},
-        {'name': 'FZALGOR', 'value':chdu.get_FZALGOR(extname), 'comment':'Compression type'},
-        {'name': 'FZDTHRSD','value':chdu.get_FZDTHRSD(extname),'comment':'Dithering seed value'},
-        {'name': 'FZQVALUE','value':chdu.get_FZQVALUE(extname),'comment':'Compression quantization factor'},
+        {'name': 'EXTNAME',
+         'value': extname,
+         'comment': 'Name of the extension'},
+        {'name': 'DES_EXT',
+         'value': DES_EXT[extname],
+         'comment': 'DES name of the extension'},
+        {'name': 'FZALGOR',
+         'value': chdu.get_FZALGOR(extname),
+         'comment': 'Compression type'},
+        {'name': 'FZDTHRSD',
+         'value': chdu.get_FZDTHRSD(extname),
+         'comment':'Dithering seed value'},
+        {'name': 'FZQVALUE',
+         'value': chdu.get_FZQVALUE(extname),
+         'comment': 'Compression quantization factor'},
         ]
     # We only update FZQMETHD if not NONE
     if chdu.get_FZQMETHD(extname) != "NONE":
-        rec = {'name': 'FZQMETHD','value':chdu.get_FZQMETHD(extname),'comment':'Compression quantization method'}
+        rec = {'name': 'FZQMETHD',
+               'value': chdu.get_FZQMETHD(extname),
+               'comment': 'Compression quantization method'}
         records.append(rec)
 
     # Now we add them to the header
@@ -1059,20 +1055,21 @@ def update_hdr_compression(hdr,extname):
 
 
 def insert_eupspipe(hdr):
-    import os
-
     try:
         EUPSPROD = os.environ['DESDM_PIPEPROD']
-        EUPSVER  = os.environ['DESDM_PIPEVER']
+        EUPSVER = os.environ['DESDM_PIPEVER']
     except:
         logger.info("WARNING: Could not find DESDM_PIPEPROD and DESDM_PIPEPVER in the environment")
         return hdr
 
     records = [
-        {'name': 'EUPSPROD','value':EUPSPROD,'comment':'eups pipeline meta-package name'},
-        {'name': 'EUPSVER', 'value':EUPSVER, 'comment':'eups pipeline meta-package version'},
+        {'name': 'EUPSPROD',
+         'value': EUPSPROD,
+         'comment': 'eups pipeline meta-package name'},
+        {'name': 'EUPSVER',
+         'value': EUPSVER,
+         'comment': 'eups pipeline meta-package version'},
         ]
     # Now we add them to the header
     [hdr.add_record(rec) for rec in records]
     return hdr
-

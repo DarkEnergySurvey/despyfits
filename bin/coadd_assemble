@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import time
 import logging
@@ -11,4 +11,4 @@ args = coadd_assemble.cmdline()
 kwargs = vars(args)
 coadd_assemble.merge(**kwargs)
 logger = logging.getLogger('Merge')
-logger.info("Coadd Merge MEF Time: %s" % elapsed_time(t0))
+logger.info(f"Coadd Merge MEF Time: {elapsed_time(t0)}")

@@ -1,17 +1,16 @@
-#!/usr/bin/env python
 """Utilities to find DES HDUs in FITS files
 """
 from fitsio import FITS
 
-class DESFITSInventory(object):
+class DESFITSInventory:
     """An invertory of the contents of a DES FITS file
     """
 
     def __init__(self, fname):
         self.hdr = []
         with FITS(fname) as fits:
-            for i, hdu in enumerate(fits):
-                self.hdr.append( hdu.read_header() )
+            for hdu in fits:
+                self.hdr.append(hdu.read_header())
 
     def hdr_keyword_matches(self, keyword, value=None, strip=True):
         def hdr_matches(hdr):
@@ -28,10 +27,10 @@ class DESFITSInventory(object):
                     # Its not a string, so strip makes no sense
                     pass
 
-            value_matches = read_value==value
+            value_matches = read_value == value
             return value_matches
 
-        matching_hdus = [i for i,h in enumerate(self.hdr) if hdr_matches(h)]
+        matching_hdus = [i for i, h in enumerate(self.hdr) if hdr_matches(h)]
         return matching_hdus
 
     def ccd_hdus(self, ccdnum):
@@ -70,5 +69,3 @@ class DESFITSInventory(object):
         if not self.hdr[0]['PROCTYPE'].strip() == 'RAW':
             return []
         return self.hdr_keyword_matches('CCDNUM')
-        
-        
