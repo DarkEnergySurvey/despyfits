@@ -28,7 +28,7 @@ libcompressionhdu = Extension(
 
 # The main call
 setup(name='despyfits',
-      version ='devel',
+      version ='3.0.0',
       license = "GPL",
       description = "A set of handy Python fitsfile-related utility functions for DESDM",
       author = "Felipe Menanteau, Eric Neilsen",
