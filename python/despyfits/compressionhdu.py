@@ -2,12 +2,17 @@
 
 import ctypes
 import platform
+import os
 
 lib_ext = {'Linux': 'so',
            'Darwin': 'dylib'}
 try:
     libcompressionhdu = ctypes.CDLL(
-        'libcompressionhdu.' + lib_ext[platform.system()])
+        os.path.join(
+            os.environ['DESPYFITS_DIR'], 
+            'libcompressionhdu.' + lib_ext[platform.system()],
+        )
+    )
 except KeyError:
     raise RuntimeError("Unknown platform: " + platform.system())
 
