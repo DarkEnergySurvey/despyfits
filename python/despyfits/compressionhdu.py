@@ -9,7 +9,8 @@ lib_ext = {'Linux': 'so',
 try:
     libcompressionhdu = ctypes.CDLL(
         os.path.join(
-            os.environ['DESPYFITS_DIR'], 
+            os.getenv('DESPYFITS_DIR'), 
+            'lib', 
             'libcompressionhdu.' + lib_ext[platform.system()],
         )
     )
