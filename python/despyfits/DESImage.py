@@ -841,7 +841,12 @@ lib_ext = {'Linux': 'so',
            'Darwin': 'dylib'}
 try:
     libdesimage = ctypes.CDLL(
-        'libdesimage.' + lib_ext[platform.system()])
+        os.path.join(
+            os.getenv('DESPYFITS_DIR'), 
+            'lib', 
+            'libdesimage.' + lib_ext[platform.system()],
+        )
+    )
 except KeyError:
     raise RuntimeError("Unknown platform: " + platform.system())
 
